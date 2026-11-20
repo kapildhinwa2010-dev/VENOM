@@ -7,13 +7,30 @@ import sys
 from venom.memory.store import MemoryStore
 from venom.reflex.budget import Budget
 from venom.tools.handlers import ToolHandlers
-from venom.tools.schema import P0_TOOLS
+from venom.tools.schema import ALL_TOOLS, P0_TOOLS
 
 PROTOCOL = "2024-11-05"
 
+# v0.3.0: the server serves the FULL tool surface. `tools` can be narrowed for
+# a Tier-2 (API-only) host, which has no access to the host's internals and
+# therefore must not be offered the self-read or intervention tools.
+DEFAULT_TOOLS = ALL_TOOLS
 
-def make_server(store: MemoryStore | None = None) -> ToolHandlers:
-    return ToolHandlers(store or MemoryStore(), Budget())
+
+def make_server(store: MemoryStore | None = None, budget: Budget | None = None,
+                runtime=None, tools=None) -> ToolHandlers:
+    """Build the handler set.
+
+    If a `runtime` is given, its handlers are used so the tools share the
+    runtime's store, budget and host wiring (probe, taps, dials).
+    """
+    if runtime is not None:
+        h = runtime.handlers()
+        h.tool_defs = list(tools or DEFAULT_TOOLS)
+        return h
+    h = ToolHandlers(store or MemoryStore(), budget or Budget())
+    h.tool_defs = list(tools or DEFAULT_TOOLS)
+    return h
 
 
 def handle(req: dict, h: ToolHandlers):
@@ -31,11 +48,11 @@ def handle(req: dict, h: ToolHandlers):
         h.budget.reset()
         result = {
             "protocolVersion": PROTOCOL,
-            "serverInfo": {"name": "venom", "version": "0.2.0"},
+            "serverInfo": {"name": "venom", "version": "0.3.0"},
             "capabilities": {"tools": {}},
         }
     elif method == "tools/list":
-        result = {"tools": P0_TOOLS}
+        result = {"tools": getattr(h, "tool_defs", DEFAULT_TOOLS)}
     elif method == "tools/call":
         p = req.get("params") or {}
         if not isinstance(p, dict):

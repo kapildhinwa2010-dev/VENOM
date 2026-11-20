@@ -60,7 +60,25 @@ def test_budget_cap():
 
 def test_server_tools_list():
     resp = handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}, make_server())
-    assert len(resp["result"]["tools"]) == 3
+    names = [t["name"] for t in resp["result"]["tools"]]
+    # the full Tier-1 surface (v0.3.0)
+    for expected in ("venom.recall", "venom.remember", "venom.time_now",
+                     "venom.uncertainty", "venom.check_myself", "venom.why",
+                     "venom.where", "venom.dial", "venom.audit",
+                     "venom.verify", "venom.forget", "venom.snapshot",
+                     "venom.restore", "venom.report"):
+        assert expected in names, f"{expected} missing from tools/list"
+
+
+def test_server_can_serve_the_tier2_surface_only():
+    """An API-only host has no access to internals -> no self-read tools."""
+    from venom.tools.schema import TIER2_TOOLS
+    h = make_server(tools=TIER2_TOOLS)
+    resp = handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}, h)
+    names = [t["name"] for t in resp["result"]["tools"]]
+    assert "venom.recall" in names
+    assert "venom.uncertainty" not in names
+    assert "venom.dial" not in names
 
 
 def test_bench_plumbing():
@@ -271,7 +289,16 @@ def test_drift_length_mismatch():
 
 def test_unknown_tool_rejected():
     h = ToolHandlers(MemoryStore())
-    assert h.call("venom.dial", {})["error"] == "unknown_tool"
+    out = h.call("venom.definitely_not_a_tool", {})
+    assert out["error"] == "unknown_tool"
+    assert "available" in out
+
+
+def test_known_tool_without_host_capability_reports_clearly():
+    """A known tool that needs host internals must say so, not pretend."""
+    h = ToolHandlers(MemoryStore())
+    out = h.call("venom.dial", {"layer": 0, "delta": 0.1})
+    assert out["error"] == "no_dial_manager"
 
 
 def test_reflex_budget_interaction():

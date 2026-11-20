@@ -152,8 +152,123 @@ def cmd_recall(args) -> int:
 
 
 def cmd_tools(args) -> int:
-    from venom.tools.schema import P0_TOOLS
-    print(json.dumps({"tools": P0_TOOLS}, indent=2))
+    from venom.tools.schema import ALL_TOOLS, TIER2_TOOLS
+    tools = TIER2_TOOLS if args.tier == 2 else ALL_TOOLS
+    if args.names:
+        print(json.dumps({"tools": [t["name"] for t in tools]}, indent=2))
+    else:
+        print(json.dumps({"tools": tools}, indent=2))
+    return 0
+
+
+def cmd_probe(args) -> int:
+    """Run one forward pass and report what the self-read tools see."""
+    import torch
+
+    from venom.shell.attach import attach
+
+    model, tok = _load_model(args.model, args.dtype)
+    runtime = VenomRuntime(VenomConfig(session_id=args.session, max_calls=20))
+    runtime.remember(*(args.remember.split("=", 1) if "=" in args.remember
+                        else ("capital of france", "Paris")))
+
+    out = {}
+    with attach(model, tok, runtime=runtime, name_hint=args.model) as host:
+        ids = tok(args.prompt, return_tensors="pt")
+        with torch.no_grad():
+            model(**ids)
+        for tool, tool_args in [
+            ("venom.uncertainty", {}),
+            ("venom.check_myself", {}),
+            ("venom.why", {"token": args.token}),
+            ("venom.where", {"concept": args.concept}),
+            ("venom.audit", {}),
+        ]:
+            try:
+                out[tool] = host.call_tool(tool, tool_args)
+            except Exception as exc:  # noqa: BLE001
+                out[tool] = {"ok": False, "error": str(exc)}
+
+    def trim(obj):
+        if isinstance(obj, dict):
+            return {k: trim(v) for k, v in obj.items()
+                    if k not in ("caveat", "warning", "note", "per_layer", "layers")}
+        if isinstance(obj, list):
+            return obj[:8]
+        return obj
+
+    print(json.dumps({"model": args.model, "prompt": args.prompt,
+                      "tools": trim(out)}, indent=2, default=str))
+    return 0
+
+
+def cmd_chat(args) -> int:
+    """Interactive chat with VENOM attached."""
+    from venom.shell.attach import attach
+
+    model, tok = _load_model(args.model, args.dtype)
+    runtime = VenomRuntime(VenomConfig(session_id=args.session))
+    for fact in args.remember or []:
+        if "=" in fact:
+            k, v = fact.split("=", 1)
+            runtime.remember(k, v)
+
+    print(f"VENOM attached to {args.model}. Type 'exit' to quit.")
+    with attach(model, tok, runtime=runtime, name_hint=args.model) as host:
+        while True:
+            try:
+                line = input("> ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                break
+            if not line:
+                continue
+            if line in ("exit", "quit"):
+                break
+            if line.startswith("/"):
+                cmd = line[1:].split()
+                if cmd and cmd[0] in ("recall", "report", "tools"):
+                    print(json.dumps(host.call_tool("venom." + cmd[0],
+                                                   {"query": cmd[1]} if len(cmd) > 1 else {}),
+                                     indent=2, default=str))
+                continue
+            out = host.generate(line, max_new_tokens=args.max_new_tokens, do_sample=False)
+            print(out)
+
+
+def cmd_dial(args) -> int:
+    """Apply a bounded self-edit and report the drift."""
+    import torch
+
+    from venom.core.dials import logit_drift
+    from venom.shell.attach import attach
+
+    model, tok = _load_model(args.model, args.dtype)
+    runtime = VenomRuntime(VenomConfig(session_id=args.session, enable_dials=True))
+    ids = tok(args.prompt, return_tensors="pt")
+    with torch.no_grad():
+        before = model(**ids).logits
+
+    with attach(model, tok, runtime=runtime, name_hint=args.model) as host:
+        # the dial verifier compares against a baseline; without one it will
+        # refuse the edit (and say so) rather than pretend it is safe
+        host.capture_baseline(ids)
+        out = host.call_tool("venom.dial", {"layer": args.layer, "delta": args.delta})
+        with torch.no_grad():
+            after = model(**ids).logits
+        drift = logit_drift(before, after)
+        revert = host.call_tool("venom.dial", {"layer": args.layer, "delta": args.delta,
+                                               "apply": False})
+        with torch.no_grad():
+            restored = model(**ids).logits
+
+    print(json.dumps({
+        "model": args.model, "layer": args.layer, "delta": args.delta,
+        "dial_result": out,
+        "drift": drift,
+        "revert_result": revert,
+        "bit_exact_after_revert": bool(torch.equal(before, restored)),
+    }, indent=2, default=str))
     return 0
 
 
@@ -202,7 +317,36 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(func=cmd_recall)
 
     s = sub.add_parser("tools", help="print the MCP tool schemas")
+    s.add_argument("--tier", type=int, choices=[1, 2], default=1)
+    s.add_argument("--names", action="store_true", help="print names only")
     s.set_defaults(func=cmd_tools)
+
+    s = sub.add_parser("probe", help="run one pass and report the self-read tools")
+    s.add_argument("--model", required=True)
+    s.add_argument("--prompt", default="The capital of France is")
+    s.add_argument("--token", default=" Paris")
+    s.add_argument("--concept", default=" France")
+    s.add_argument("--remember", default="capital of france=Paris")
+    s.add_argument("--session", default="default")
+    s.add_argument("--dtype", default="auto")
+    s.set_defaults(func=cmd_probe)
+
+    s = sub.add_parser("chat", help="interactive chat with VENOM attached")
+    s.add_argument("--model", required=True)
+    s.add_argument("--remember", action="append", help="key=value facts to seed")
+    s.add_argument("--max-new-tokens", type=int, default=48)
+    s.add_argument("--session", default="default")
+    s.add_argument("--dtype", default="auto")
+    s.set_defaults(func=cmd_chat)
+
+    s = sub.add_parser("dial", help="apply a bounded self-edit and measure the drift")
+    s.add_argument("--model", required=True)
+    s.add_argument("--layer", type=int, default=0)
+    s.add_argument("--delta", type=float, default=0.05)
+    s.add_argument("--prompt", default="The capital of France is")
+    s.add_argument("--session", default="default")
+    s.add_argument("--dtype", default="auto")
+    s.set_defaults(func=cmd_dial)
 
     return p
 

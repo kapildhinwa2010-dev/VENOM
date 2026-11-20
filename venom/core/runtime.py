@@ -6,6 +6,13 @@ This is the object that makes the layer *plug-in*. It owns:
   * the call budget         (hard cap per answer)
   * the reflex              (rule-based auto-trigger)
   * the telemetry           (what happened, in numbers)
+  * the optional collaborators that expose the host's internals:
+      probe    - live logits        (venom.core.probe.LogitProbe)
+      taps     - per-layer hidden   (venom.core.bus.Bus.taps)
+      norm     - final norm module
+      lm_head  - output projection
+      dials    - bounded self-edit  (venom.core.dials.DialManager)
+      rollback - state snapshots    (venom.verify.rollback.RollbackManager)
 
 It does NOT own the model. A host can be:
 
@@ -20,18 +27,18 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from venom.memory.store import MemoryStore
 from venom.reflex.budget import Budget
 from venom.reflex.injector import Injector
 from venom.reflex.triggers import Reflex
-from venom.tools.schema import P0_TOOLS
+from venom.tools.schema import ALL_TOOLS
 
 
 @dataclass
 class VenomConfig:
-    """Everything tunable, in one place. Defaults are the v0.1 tested values."""
+    """Everything tunable, in one place. Defaults are the tested values."""
 
     memory_capacity: int = 1024
     max_calls: int = 3
@@ -44,6 +51,11 @@ class VenomConfig:
     # The reflex may rewrite the prompt (memory injection). Set False for hosts
     # that call tools themselves - there the reflex only *advises*.
     inject_memory: bool = True
+    # Bounded self-edit is OFF unless a host explicitly wires a DialManager.
+    enable_dials: bool = False
+    max_delta: float = 0.1
+    max_active_dials: int = 4
+    drift_threshold: float = 0.02
 
 
 class VenomRuntime:
@@ -75,6 +87,44 @@ class VenomRuntime:
         }
         self._t0 = time.perf_counter()
 
+        # --- host internals (all optional) ---
+        self.probe = None
+        self.taps_provider: Optional[Callable[[], Dict[str, Any]]] = None
+        self.norm = None
+        self.lm_head = None
+        self.tokenizer = None
+        self.dials = None
+        self.rollback = None
+
+    # -------------------------------------------------------- host wiring
+    def bind_host(self, *, probe=None, taps_provider=None, norm=None,
+                  lm_head=None, tokenizer=None, dials=None, rollback=None) -> "VenomRuntime":
+        """Give the runtime access to a host's internals.
+
+        A probe that is not attached yet is attached here - the host owns the
+        lifecycle, but a caller should not have to remember a second step.
+        """
+        self.probe = probe
+        if probe is not None and not getattr(probe, "attached", False):
+            try:
+                probe.attach()
+            except Exception:  # noqa: BLE001 - a host without a probe is fine
+                pass
+        self.taps_provider = taps_provider
+        self.norm = norm
+        self.lm_head = lm_head
+        self.tokenizer = tokenizer
+        self.dials = dials
+        self.rollback = rollback
+        return self
+        return self
+
+    def taps(self) -> Dict[str, Any]:
+        """Current per-layer hidden states (empty if the host exposes none)."""
+        if self.taps_provider is None:
+            return {}
+        return self.taps_provider() or {}
+
     # ------------------------------------------------------------- memory
     def remember(self, key: str, value: str) -> dict:
         return self.store.remember(key, value)
@@ -86,13 +136,33 @@ class VenomRuntime:
     @staticmethod
     def tool_defs() -> List[Dict[str, Any]]:
         """MCP tool schemas this runtime serves."""
-        return [dict(t) for t in P0_TOOLS]
+        return [dict(t) for t in ALL_TOOLS]
+
+    def handlers(self):
+        """A ToolHandlers wired to this runtime and its host."""
+        from venom.tools.handlers import ToolHandlers
+        from venom.verify.rollback import RollbackManager
+
+        if self.rollback is None:
+            self.rollback = RollbackManager()
+
+        return ToolHandlers(
+            self.store,
+            self.budget,
+            probe=self.probe,
+            taps=self.taps(),
+            norm=self.norm,
+            lm_head=self.lm_head,
+            tokenizer=self.tokenizer,
+            dials=self.dials,
+            rollback=self.rollback,
+            report_fn=self.report,
+        )
 
     def call_tool(self, name: str, args: Dict[str, Any]) -> dict:
-        """Execute a tool. The budget is enforced here, once, for all hosts."""
-        from venom.tools.handlers import ToolHandlers
-
-        handlers = ToolHandlers(self.store, self.budget)
+        """Execute a tool against a fresh handler bound to the live state."""
+        handlers = self.handlers()
+        handlers.taps = self.taps()
         out = handlers.call(name, args)
         if out.get("ok"):
             self.telemetry["tool_calls"] += 1

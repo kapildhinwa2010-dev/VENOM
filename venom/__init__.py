@@ -4,4 +4,4 @@ The host model is the agent. VENOM knows nothing on its own - it only serves too
 Every intervention is measured, bounded and reversible.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

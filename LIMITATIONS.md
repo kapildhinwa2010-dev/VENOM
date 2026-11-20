@@ -1,4 +1,4 @@
-# LIMITATIONS — measured vs claimed (v0.2.0)
+# LIMITATIONS — measured vs claimed (v0.3.0)
 
 Every number in this file is either **measured** (with the command that produced it) or
 **not measured**. Nothing here is a prediction dressed as a result.
@@ -32,7 +32,14 @@ Every number in this file is either **measured** (with the command that produced
 | **Bit-exact attach → detach on those three architectures** | `experiments/e2_universal_attach.py` | ✅ `bit_exact_during=true`, `bit_exact_after_detach=true`, `hash_match=true` for all three |
 | The single-file `venom/standalone.py` drop-in | copied into a bare directory, no install | ✅ bit-exact on all three models |
 | The API proxy injects AND forwards | `tests/test_universal.py` | ✅ end-to-end against a fake upstream |
-| `venom` CLI: fingerprint / attach / tools | run manually | ✅ works on GPT-2 |
+| `venom` CLI: fingerprint / attach / tools / probe / chat / dial | run manually | ✅ works on GPT-2 |
+| **`venom.uncertainty` on a real forward pass** | `experiments/e3_selfread.py` | ✅ entropy 5.9984, margin 0.0366, confidence 0.0846, `is_uncertain: true` on GPT-2 after "The capital of France is" |
+| **`venom.check_myself` on a real forward pass** | `experiments/e3_selfread.py` | ✅ 1 of 12 layers agree with the final top-1 on GPT-2 — the decision is late |
+| **`venom.where(" France")`** | `experiments/e3_selfread.py` | ✅ best represented at layer 9 (rank 0) on GPT-2 |
+| **`venom.why(" Paris")`** | `experiments/e3_selfread.py` | ✅ target logit −8.84 at layer 0, never overtakes; `decision_layer: null` — GPT-2 did not predict "Paris" |
+| **`venom.audit` on a real forward pass** | `experiments/e3_selfread.py` | ✅ 8 of 11 layer pairs are near-duplicates (cosine > 0.99); 5 of 6 sampled layers compressible |
+| **`venom.dial` drift + auto-rollback** | `venom dial --model gpt2 --layer 3` | ✅ delta 0.01/0.02/0.03 → drift 0.0065/0.0124/0.0179, applied and verified; delta 0.05 → drift 0.0281 > 0.02 → **auto-rolled back**, host restored bit-exactly |
+| Every self-read tool **degrades honestly** with no probe/taps attached | `tests/test_tools_v3.py` | ✅ returns `no_probe` / an error, never a fabricated number |
 
 ## 2. What is NOT verified
 
@@ -134,6 +141,32 @@ Each of these was confirmed by a reproducing script, not suspected.
    The claim "works on any model" is a *mechanism* claim — the discoverer does
    not look up a table — but it has been exercised on three.
 
+## 4c. v0.3.0 tool-surface limitations
+
+1. **The self-read numbers are self-reports about a computation, not about
+   knowledge.** `uncertainty` reads the model's own softmax; `check_myself`
+   reads layer agreement; `why`/`where` read a logit lens. None of these is a
+   measure of understanding or introspection. The published evidence is
+   against the strong reading (arXiv 2611.15267: a supervised probe beats the
+   model's own self-report 98.3% vs 11.1%; arXiv 2603.05414: detection is
+   content-agnostic). Every tool payload carries this caveat.
+2. **`why` and `where` are logit-lens readouts, not causal proofs.** They show
+   where a token's logit *rises*, not that the layer *causes* the choice.
+   A causal claim would need an intervention (ablate the layer and re-measure).
+3. **`dial` measures magnitude, not quality.** The drift threshold is a guard
+   rail against large behavioural change. It says nothing about whether the
+   edited model is better. The plan's P4 exit gate (bit-exact detach after
+   rollback) is met; the "is it an improvement" question is **unanswered**.
+4. **`audit` is report-only by design.** It analyses the activations that were
+   captured for one prompt. A layer that looks "dead" may simply not have been
+   needed. Nothing is pruned.
+5. **`where` returns a best layer, not a proof.** The ranking is computed
+   from a single logit-lens readout at one position; it can be wrong when the
+   concept is represented non-linearly.
+6. **The P3 ablation is a plumbing check, not a result.** The e3 experiment
+   compares one prompt with and without an uncertainty hint. It is not a
+   benchmark and its outcome must not be quoted as a number.
+
 ## 5. Claims deliberately not made
 
 - **No latency claim beyond "about 2%".** The measurement on this shared CPU is
@@ -153,6 +186,12 @@ Each of these was confirmed by a reproducing script, not suspected.
   been *exercised* on three architectures. Anthropic-native and Gemini-native APIs
   need their own adapters.
 - **No speed win claim.** The layer adds work.
+- **No claim that self-edit improves the model.** The dials framework proves
+  that an edit can be bounded, measured and reverted. Whether a bounded edit
+  *helps* is untested.
+- **No claim that the self-read tools give the model self-knowledge.** They
+  give it a sensor. The difference is the whole scientific question of this
+  project, and it is still open (see `RESEARCH.md` §5, experiment E5).
 
 ## 6. What would make the next claim honest
 

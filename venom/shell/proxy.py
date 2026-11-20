@@ -29,7 +29,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, Optional
 
 from venom.core.runtime import VenomRuntime
-from venom.tools.schema import P0_TOOLS
+from venom.tools.schema import ALL_TOOLS, TIER2_TOOLS
 
 
 class VenomProxy:
@@ -40,7 +40,8 @@ class VenomProxy:
                  upstream_model: Optional[str] = None,
                  host: str = "127.0.0.1", port: int = 8765,
                  inject_memory: bool = True,
-                 timeout: int = 120):
+                 timeout: int = 120,
+                 tier: int = 2):
         self.runtime = runtime
         self.upstream_base_url = upstream_base_url.rstrip("/")
         self.upstream_api_key = upstream_api_key
@@ -49,6 +50,11 @@ class VenomProxy:
         self.port = port
         self.inject_memory = inject_memory
         self.timeout = timeout
+        # An API host has no access to its own internals, so by default it is
+        # offered the Tier-2 surface only. tier=1 offers everything, for a
+        # local proxy in front of a model you control.
+        self.tier = tier
+        self.tool_defs = TIER2_TOOLS if tier == 2 else ALL_TOOLS
 
         self._server: Optional[ThreadingHTTPServer] = None
         self._thread: Optional[threading.Thread] = None
@@ -78,8 +84,11 @@ class VenomProxy:
                 proxy._handle(self)
 
             def do_GET(self):  # noqa: N802 - http.server API
-                if self.path.rstrip("/").endswith("/venom/tools"):
-                    self._respond(200, {"tools": P0_TOOLS})
+                path = self.path.rstrip("/")
+                if path.endswith("/venom/tools"):
+                    self._respond(200, {"tools": proxy.tool_defs})
+                elif path.endswith("/venom/stats"):
+                    self._respond(200, proxy.stats())
                 else:
                     self._respond(404, {"error": "not found"})
 
@@ -112,6 +121,14 @@ class VenomProxy:
             payload = json.loads(raw.decode("utf-8"))
         except Exception:  # noqa: BLE001
             handler._respond(400, {"error": "invalid JSON"})
+            return
+
+        # a direct tool-call endpoint: POST /venom/tools/call
+        if handler.path.rstrip("/").endswith("/venom/tools/call"):
+            name = payload.get("name") or ""
+            args = payload.get("arguments") or {}
+            out = self.runtime.call_tool(name, args)
+            handler._respond(200, out)
             return
 
         self.requests += 1

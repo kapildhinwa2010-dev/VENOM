@@ -171,7 +171,7 @@ def test_runtime_note_answer_rearms_the_budget():
 
 def test_runtime_tool_defs_are_mcp_shaped():
     tools = VenomRuntime.tool_defs()
-    assert len(tools) == 3
+    assert len(tools) == 14
     for t in tools:
         assert t["name"].startswith("venom.")
         assert "inputSchema" in t
@@ -267,3 +267,80 @@ def test_proxy_end_to_end_against_a_fake_upstream():
         proxy.stop()
         server.shutdown()
         server.server_close()
+
+
+def test_proxy_exposes_tools_and_stats_over_http():
+    """A remote client must be able to list tools, call them and read stats."""
+    import http.server
+    import socketserver
+
+    class Fake(http.server.BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def log_message(self, *a):
+            pass
+
+        def do_POST(self):
+            n = int(self.headers.get("Content-Length") or 0)
+            self.rfile.read(n)
+            out = json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(out)))
+            self.end_headers()
+            self.wfile.write(out)
+
+    server = socketserver.TCPServer(("127.0.0.1", 0), Fake)
+    port = server.server_address[1]
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+
+    rt = VenomRuntime()
+    proxy = VenomProxy(rt, upstream_base_url=f"http://127.0.0.1:{port}/v1")
+    proxy.start()
+    try:
+        def get(path):
+            with urllib.request.urlopen(proxy.base_url + path, timeout=10) as r:
+                return json.loads(r.read().decode())
+
+        def post(path, body):
+            req = urllib.request.Request(
+                proxy.base_url + path,
+                data=json.dumps(body).encode(),
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=10) as r:
+                return json.loads(r.read().decode())
+
+        tools = get("/venom/tools")["tools"]
+        assert len(tools) >= 5
+        # the API tier must not offer tools that need the host's internals
+        names = [t["name"] for t in tools]
+        assert "venom.recall" in names
+        assert "venom.uncertainty" not in names
+
+        out = post("/venom/tools/call", {
+            "name": "venom.remember",
+            "arguments": {"key": "capital of france", "value": "Paris"},
+        })
+        assert out["ok"] is True
+
+        out = post("/venom/tools/call", {
+            "name": "venom.recall",
+            "arguments": {"query": "capital of france"},
+        })
+        assert out["value"] == "Paris"
+
+        stats = get("/venom/stats")
+        assert stats["requests"] >= 0
+    finally:
+        proxy.stop()
+        server.shutdown()
+        server.server_close()
+
+
+def test_proxy_tier1_offers_the_full_surface():
+    rt = VenomRuntime()
+    proxy = VenomProxy(rt, upstream_base_url="http://127.0.0.1:1/v1", tier=1)
+    names = [t["name"] for t in proxy.tool_defs]
+    assert "venom.uncertainty" in names
+    assert "venom.dial" in names
