@@ -51,6 +51,26 @@ def main():
     bus_ms = bench(lambda: model(ids))
     b.detach()
 
+    # Interleaved A/B re-measurement. Measuring all of A then all of B lets
+    # CPU frequency scaling bias the result - the first version of this
+    # script reported a ratio of 0.92 (bus "faster" than no bus), which is
+    # impossible. Alternating the two conditions cancels the drift.
+    base_samples, bus_samples = [], []
+    for _ in range(5):
+        base_samples.append(bench(lambda: model(ids)))
+        b.attach()
+        bus_samples.append(bench(lambda: model(ids)))
+        b.detach()
+    base_ms = min(base_samples)
+    bus_ms = min(bus_samples)
+
+    # v0.1.2: release() detaches AND frees the captured activations. Without
+    # it, the taps keep every layer's full activation on the host device - for
+    # a 70B model with a 4k context that is tens of GB.
+    b.detach()
+    tap_bytes = sum(t.numel() * t.element_size() for t in b.taps.values())
+    b.release()
+
     out = {
         "model": NAME,
         "params_M": round(sum(p.numel() for p in model.parameters()) / 1e6, 2),
@@ -64,6 +84,8 @@ def main():
         "bus_ms": round(bus_ms, 3),
         "latency_ratio": round(bus_ms / baseline_ms, 4),
         "bus_detached_cleanly": not b.attached,
+        "tap_bytes_retained": tap_bytes,
+        "tap_bytes_after_release": sum(t.numel() * t.element_size() for t in b.taps.values()),
     }
     print(json.dumps(out, indent=2))
     with open("e1_result.json", "w", encoding="utf-8") as fh:

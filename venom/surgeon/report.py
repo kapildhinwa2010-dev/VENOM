@@ -10,7 +10,9 @@ from typing import Dict, List
 
 
 def dead_neuron_report(activation_counts: Dict[str, int], total_samples: int,
-                       threshold: float = 0.001) -> Dict:
+                       threshold: float = 0.001, low_threshold: float = 0.05) -> Dict:
+    """v0.1.2: `low_threshold` is now a parameter. It used to be hardcoded at
+    0.05, so raising `threshold` above it silently emptied the "low" bucket."""
     if total_samples <= 0:
         return {"error": "total_samples must be > 0"}
     dead, low, active = [], [], []
@@ -18,7 +20,7 @@ def dead_neuron_report(activation_counts: Dict[str, int], total_samples: int,
         frac = count / total_samples
         if frac < threshold:
             dead.append({"name": name, "frac": round(frac, 6)})
-        elif frac < 0.05:
+        elif frac < low_threshold:
             low.append({"name": name, "frac": round(frac, 6)})
         else:
             active.append(name)
@@ -30,6 +32,7 @@ def dead_neuron_report(activation_counts: Dict[str, int], total_samples: int,
         "low": len(low),
         "active": len(active),
         "threshold": threshold,
+        "low_threshold": low_threshold,
         "samples": total_samples,
         "dead_entries": dead[:50],
         "warning": "NOT removed. Pruning needs an opt-in surgery mode plus a drift proof.",
@@ -54,7 +57,11 @@ def compressibility_report(svd_spectra: Dict[str, List[float]]) -> Dict:
             continue
         total_e = sum(v * v for v in vals)
         if total_e == 0:
-            results[name] = {"compressible": True}
+            # v0.1.2: keep the same schema as every other entry, otherwise a
+            # consumer doing details[name]["eff_rank"] gets a KeyError.
+            results[name] = {
+                "eff_rank": 0, "full_rank": len(vals), "ratio": 0.0, "compressible": True,
+            }
             continue
         cum = 0.0
         k99 = len(vals)

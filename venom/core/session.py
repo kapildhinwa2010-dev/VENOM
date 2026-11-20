@@ -27,6 +27,13 @@ class Session:
                 {"key": k, "value": v["value"], "digest": v["digest"]}
                 for k, v in self.store._data.items()
             ],
+            # v0.1.2: the memory bound and the budget consumption must survive a
+            # save/load cycle. Without them, restoring a session silently
+            # re-armed the full tool-call budget and removed the memory cap -
+            # exactly the two guarantees this prototype advertises.
+            "memory_capacity": self.store.capacity,
+            "memory_evictions": self.store.evictions,
+            "memory_corruptions": self.store.corruptions,
             "budget": self.budget.state(),
             "telemetry": self.telemetry,
         }
@@ -36,10 +43,21 @@ class Session:
 
     @classmethod
     def from_dict(cls, blob: Dict[str, Any]) -> "Session":
-        store = MemoryStore(session_id=blob.get("session_id", "default"))
+        store = MemoryStore(
+            capacity=int(blob.get("memory_capacity", 1024)),
+            session_id=blob.get("session_id", "default"),
+        )
         for entry in blob.get("memory", []):
-            store.remember(entry["key"], entry["value"])
-        budget = Budget(max_calls=blob.get("budget", {}).get("max", 3))
+            # restore() keeps the PERSISTED digest, so a tampered file still
+            # abstains instead of loading as a valid hit.
+            store.restore(entry["key"], entry["value"], entry.get("digest"))
+        store.evictions = int(blob.get("memory_evictions", 0))
+        store.corruptions = int(blob.get("memory_corruptions", 0))
+
+        bstate = blob.get("budget", {}) or {}
+        budget = Budget(max_calls=int(bstate.get("max", 3)))
+        budget.used = int(bstate.get("used", 0))
+
         return cls(
             session_id=blob.get("session_id", "default"),
             store=store,
@@ -55,16 +73,7 @@ class Session:
     def load(cls, path: str) -> "Session":
         with open(path, encoding="utf-8") as fh:
             blob = json.load(fh)
-        store = MemoryStore(session_id=blob.get("session_id", "default"))
-        for entry in blob.get("memory", []):
-            store.remember(entry["key"], entry["value"])
-        budget = Budget(max_calls=blob.get("budget", {}).get("max", 3))
-        return cls(
-            session_id=blob.get("session_id", "default"),
-            store=store,
-            budget=budget,
-            telemetry=blob.get("telemetry", {}),
-        )
+        return cls.from_dict(blob)
 
     def record(self, key: str, value: Any) -> None:
         self.telemetry[key] = value

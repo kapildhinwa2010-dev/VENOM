@@ -187,9 +187,28 @@ def test_injector_no_hit():
 
 
 def test_injector_stats():
-    s = MemoryStore(); s.remember("x", "y"); inj = Injector(s)
-    inj.maybe_inject("tell me about x")
+    s = MemoryStore(); s.remember("project deadline", "2026-01-30"); inj = Injector(s)
+    inj.maybe_inject("tell me about project deadline")
     assert inj.stats()["injections"] >= 1
+
+
+def test_injector_rejects_generic_key():
+    """v0.1.2: a one-character key must not trigger an injection.
+
+    Guards against memory-induced tool drift (arXiv 2605.24941): irrelevant
+    memories must not shift the host's behaviour.
+    """
+    s = MemoryStore(); s.remember("x", "y")
+    inj = Injector(s)
+    r = inj.maybe_inject("tell me about x")
+    assert not r["changed"] and r["reason"] == "key_too_generic"
+    assert inj.stats()["rejected_generic"] == 1
+
+
+def test_injector_allows_long_single_word():
+    s = MemoryStore(); s.remember("photosynthesis", "process in plants")
+    r = Injector(s).maybe_inject("explain photosynthesis")
+    assert r["changed"]
 
 
 def test_rollback_basic():

@@ -34,13 +34,22 @@ class Reflex:
                 yield " ".join(words[i:i + n])
 
     def decide(self, text: str, top1: Optional[float] = None, top2: Optional[float] = None) -> Trigger:
+        for key in self.matching_keys(text):
+            return Trigger(True, "memory_hit", key)
+        if top1 is not None and top2 is not None and (top1 - top2) < self.margin_threshold:
+            return Trigger(True, "low_margin", None)
+        return Trigger(False, "no_trigger", None)
+
+    def matching_keys(self, text: str):
+        """Every stored key that occurs in the text, longest first.
+
+        v0.1.2: `decide()` used to stop at the first match, which made the
+        multi-hit injection branch dead code and left `max_entries` unused.
+        """
         seen = set()
         for key in self._candidate_keys(text):
             if not key or key in seen:
                 continue
             seen.add(key)
             if self.store.has(key):
-                return Trigger(True, "memory_hit", key)
-        if top1 is not None and top2 is not None and (top1 - top2) < self.margin_threshold:
-            return Trigger(True, "low_margin", None)
-        return Trigger(False, "no_trigger", None)
+                yield key

@@ -1,4 +1,10 @@
-"""Hard cap on tool calls per answer. Stops tool spam and infinite loops."""
+"""Hard cap on tool calls per answer. Stops tool spam and infinite loops.
+
+v0.1.2: the budget is per ANSWER, not per process. `venom/server.py` now
+resets it on `initialize` (a new conversation turn), because previously the
+cap was consumed for the lifetime of the process - after 3 tool calls the host
+was muted for the rest of the session with no way to re-arm it.
+"""
 from __future__ import annotations
 
 

@@ -20,3 +20,21 @@ jobs:
           pip install -e ".[dev]"
       - name: Tests
         run: pytest -q
+
+  # v0.1.2: the torch-level trust-contract tests (bit-exact attach/detach)
+  # must actually run in CI. `pip install -e ".[dev]"` has no torch, so
+  # `pytest.importorskip("torch")` used to skip the whole file - meaning the
+  # only automated test of the central claim never executed.
+  trust-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install (torch CPU)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,torch]"
+      - name: Trust contract tests
+        run: pytest -q tests/test_bus_torch.py -v

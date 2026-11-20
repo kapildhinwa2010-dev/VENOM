@@ -9,6 +9,13 @@ MARGIN_THRESHOLD = 0.1
 
 
 def token_uncertainty(logits_row: List[float], k: int = 5) -> Dict[str, float]:
+    if not logits_row:
+        # v0.1.2: an empty row used to raise ValueError from max(), killing the
+        # whole per-token sweep on a single padded/empty row.
+        return {
+            "entropy": 0.0, "margin": 0.0, "top_k_spread": 0.0, "confidence": 0.0,
+            "is_uncertain": True, "top1_prob": 0.0, "top2_prob": 0.0,
+        }
     max_l = max(logits_row)
     exps = [math.exp(l - max_l) for l in logits_row]
     sum_exp = sum(exps)

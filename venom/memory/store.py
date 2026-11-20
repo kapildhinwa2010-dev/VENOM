@@ -18,12 +18,16 @@ _PUNCT = re.compile(r"[^\w\s]")
 
 
 def norm(key: str) -> str:
-    """Canonical key form: lowercase, collapsed whitespace, punctuation removed.
+    """Canonical key form: lowercase, collapsed whitespace, punctuation -> space.
 
     v0.1.1 change: punctuation is stripped here (not only in the reflex layer) so
     that `remember("Paris.")` and `recall("paris")` refer to the same slot.
+
+    v0.1.2 change: punctuation becomes a SPACE, not nothing. Deleting it merged
+    distinct keys ("hello,world" -> "helloworld") and silently collapsed
+    "don't"/"dont", "U.S.A."/"usa" into one slot, losing a stored fact.
     """
-    return " ".join(_PUNCT.sub("", key.strip().lower()).split())
+    return " ".join(_PUNCT.sub(" ", key.strip().lower()).split())
 
 
 def digest(value: str) -> str:
@@ -83,7 +87,25 @@ class MemoryStore:
 
     def corrupt_for_test(self, key: str, new_value: str) -> None:
         """Deliberately break the digest. Used by the abstain benchmark."""
-        self._data[norm(key)]["value"] = new_value
+        k = norm(key)
+        if k not in self._data:
+            raise KeyError(f"no such key in store: {key!r}")
+        self._data[k]["value"] = new_value
+
+    def restore(self, key: str, value: str, dig: Optional[str] = None) -> dict:
+        """Re-insert a persisted entry WITH its persisted digest.
+
+        v0.1.2: the digest is deliberately NOT recomputed. `remember()` would
+        recompute it from the payload, which means a tampered session file
+        would load as a valid hit - destroying the whole point of the digest
+        guard at the persistence boundary.
+        """
+        k = norm(key)
+        if not k:
+            return {"ok": False, "reason": "empty_key"}
+        self._data[k] = {"value": value, "digest": dig if dig else digest(value)}
+        self._data.move_to_end(k)
+        return {"ok": True, "key": k}
 
     def stats(self) -> dict:
         return {

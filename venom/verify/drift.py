@@ -20,10 +20,14 @@ def drift_report(baseline: List[str], venom: List[str], gold: Optional[List[str]
         v = venom[i].strip().lower()
         g = gold[i].strip().lower() if gold else None
 
-        if v in ABSTAIN_MARKERS:
-            abstained += 1
-            category = "abstained"
-        elif b == v:
+        # v0.1.2: the order of these checks matters.
+        #   * `b == v` first: an unchanged answer is unchanged, even if it is
+        #     an abstention in both runs.
+        #   * the gold comparison before the abstention check: replacing a
+        #     CORRECT answer with "abstain" is a REGRESSION, and must be
+        #     counted as `harmed`. Previously the abstention branch ran first
+        #     and masked the harm entirely, inflating net_gain.
+        if b == v:
             unchanged += 1
             category = "unchanged"
         elif g is not None:
@@ -35,12 +39,19 @@ def drift_report(baseline: List[str], venom: List[str], gold: Optional[List[str]
             elif base_ok and not venom_ok:
                 harmed += 1
                 category = "harmed"
+            elif v in ABSTAIN_MARKERS:
+                abstained += 1
+                category = "abstained"
             else:
                 shifted += 1
                 category = "shifted"
         else:
-            shifted += 1
-            category = "shifted"
+            if v in ABSTAIN_MARKERS:
+                abstained += 1
+                category = "abstained"
+            else:
+                shifted += 1
+                category = "shifted"
 
         details.append({"idx": i, "category": category})
 

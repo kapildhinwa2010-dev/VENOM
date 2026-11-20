@@ -11,3 +11,4 @@ htmlcov/
 e1_result.json
 *.jsonl
 .DS_Store
+e1b_latency.json
