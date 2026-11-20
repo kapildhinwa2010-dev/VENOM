@@ -31,7 +31,7 @@ def handle(req: dict, h: ToolHandlers):
         h.budget.reset()
         result = {
             "protocolVersion": PROTOCOL,
-            "serverInfo": {"name": "venom", "version": "0.1.2"},
+            "serverInfo": {"name": "venom", "version": "0.2.0"},
             "capabilities": {"tools": {}},
         }
     elif method == "tools/list":

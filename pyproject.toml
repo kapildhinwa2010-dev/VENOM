@@ -1,11 +1,14 @@
 [project]
 name = "venomlayer"
-version = "0.1.2"
+version = "0.2.0"
 description = "Training-free middleware that gives an LLM tool access to its own internals"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
 dependencies = []
+
+[project.scripts]
+venom = "venom.shell.cli:main"
 
 [project.optional-dependencies]
 torch = ["torch", "transformers", "numpy"]

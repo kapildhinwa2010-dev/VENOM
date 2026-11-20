@@ -1,4 +1,4 @@
-# LIMITATIONS — measured vs claimed
+# LIMITATIONS — measured vs claimed (v0.2.0)
 
 Every number in this file is either **measured** (with the command that produced it) or
 **not measured**. Nothing here is a prediction dressed as a result.
@@ -28,12 +28,18 @@ Every number in this file is either **measured** (with the command that produced
 | Bus hook survives tuple-returning modules and repeated attach/detach cycles | `tests/test_bus_torch.py` | ✅ |
 | Bus latency overhead, GPT-2 124M, CPU | `experiments/e1b_latency_isolated.py`, 9 randomised A/B rounds | **≈ +2% median** (bus_retain 1.02×, null_hook 1.02–1.07×) — **noise-dominated, see §5** |
 | Bus releases its captured activations | `experiments/e1_bus_detach.py` | ✅ 184,320 bytes retained → 0 after `release()` |
+| **Universal discovery finds the blocks/head/norm of an unseen architecture** | `experiments/e2_universal_attach.py` | ✅ GPT-2, Qwen2.5-0.5B (qwen2), SmolLM2-135M (llama) — `confidence: 1.0`, no hardcoded paths used |
+| **Bit-exact attach → detach on those three architectures** | `experiments/e2_universal_attach.py` | ✅ `bit_exact_during=true`, `bit_exact_after_detach=true`, `hash_match=true` for all three |
+| The single-file `venom/standalone.py` drop-in | copied into a bare directory, no install | ✅ bit-exact on all three models |
+| The API proxy injects AND forwards | `tests/test_universal.py` | ✅ end-to-end against a fake upstream |
+| `venom` CLI: fingerprint / attach / tools | run manually | ✅ works on GPT-2 |
 
 ## 2. What is NOT verified
 
 | Claim | Status | Blocked by |
 |---|---|---|
-| Bit-exact detach on **Llama / Qwen / Mistral / Phi / Gemma** | ❌ not run | needs those model weights; `hostmap` now resolves them correctly but has only been tested on synthetic shapes |
+| Bit-exact detach on **Mistral / Phi / Gemma / OLMo / Falcon** | ❌ not run | discovery is architecture-agnostic and Llama+Qwen2 are proven, but each new family should still be checked with `e2_universal_attach.py` |
+| Discovery on a model with a **non-standard block container** (not an `nn.ModuleList`) | ❌ not run | the discoverer looks for `nn.ModuleList`; a model using a plain `nn.Sequential` or a custom container would not be found |
 | Reflex path adds ≤ 15% latency on a real generation | ❌ not run | the reflex needs a full sampling loop, not a single forward pass |
 | Fix rate ≥ 40% | ❌ not run | needs a real host model; `MockHost` is plumbing only |
 | Harm rate ≤ 2% | ❌ not run | same |
@@ -105,6 +111,29 @@ Each of these was confirmed by a reproducing script, not suspected.
 11. **Negation is not detected by the bench matcher.** "not paris" still counts as
     correct. A real experiment needs a judge model, not a substring test.
 
+## 4b. v0.2.0 universal-layer limitations
+
+1. **Discovery looks for `nn.ModuleList`.** A model whose blocks live in an
+   `nn.Sequential`, a plain list, or a custom container will not be found.
+   `attach()` then refuses (below the confidence threshold) rather than
+   guessing — which is the correct behaviour, but it means "any model" means
+   "any HF causal LM with a standard block container".
+2. **The `attach()` path is HuggingFace-only.** It assumes `model.generate()`,
+   `model.parameters()` and a `tokenizer(...)` returning tensors. vLLM, Ollama
+   and raw PyTorch models need the proxy path or a custom adapter.
+3. **The proxy speaks the OpenAI wire format.** Anthropic-native and Gemini
+   native APIs need their own adapter; the proxy currently only forwards
+   `/v1/*` shaped requests.
+4. **The proxy is single-purpose.** It injects memory and enforces the budget.
+   It does not yet do response-side rewriting, so a model that ignores the
+   injected context is not detected or corrected.
+5. **The standalone file duplicates the core logic.** It is a deliberate
+   trade (no install, no dependencies) but it will drift from `venom/` unless
+   someone keeps them in sync.
+6. **Three architectures is a proof of mechanism, not of universality.**
+   The claim "works on any model" is a *mechanism* claim — the discoverer does
+   not look up a table — but it has been exercised on three.
+
 ## 5. Claims deliberately not made
 
 - **No latency claim beyond "about 2%".** The measurement on this shared CPU is
@@ -119,6 +148,10 @@ Each of these was confirmed by a reproducing script, not suspected.
 - **No novelty claim beyond the composition.** Forward hooks, activation steering,
   conditional steering (CAST), uncertainty-gated tool use (UALA) and MCP itself are all
   prior art. See `RESEARCH.md` §3.
+- **No "works with literally any AI" claim.** It works with any HuggingFace causal
+  LM that has a standard block container, and with any OpenAI-compatible API. It has
+  been *exercised* on three architectures. Anthropic-native and Gemini-native APIs
+  need their own adapters.
 - **No speed win claim.** The layer adds work.
 
 ## 6. What would make the next claim honest
