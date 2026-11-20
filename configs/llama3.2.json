@@ -1,0 +1,15 @@
+{
+  "family": "llama",
+  "name_hint": "meta-llama/Llama-3.2-1B-Instruct",
+  "blocks_path": "model.layers",
+  "lm_head_path": "lm_head",
+  "norm_path": "model.norm",
+  "tool_call_style": "openai",
+  "mcp": {
+    "transport": "stdio",
+    "command": "venom",
+    "args": ["--host", "llama3.2"]
+  },
+  "budget": { "max_calls": 3 },
+  "memory": { "capacity": 1024 }
+}

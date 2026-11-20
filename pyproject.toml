@@ -1,0 +1,22 @@
+[project]
+name = "venomlayer"
+version = "0.1.1"
+description = "Training-free middleware that gives an LLM tool access to its own internals"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+dependencies = []
+
+[project.optional-dependencies]
+torch = ["torch", "transformers"]
+dev = ["pytest"]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["venom*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
