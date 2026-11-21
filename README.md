@@ -435,6 +435,34 @@ doing real work. A pipeline that trusted redundancy alone would have flagged
 would have walked into, and it is why the ladder treats redundancy as
 `FLAG_LAYER` (report-only) rather than as a licence to cut.
 
+## The plan's exit gates — measured
+
+Run them yourself:
+
+```bash
+python experiments/e8_all_gates.py --gates recall,abstain,latency --limit 400
+python experiments/e8_all_gates.py --gates facts --model gpt2 --limit 400
+python experiments/e8_all_gates.py --gates multimodel --limit 120
+```
+
+| Gate | Target | Measured | |
+|---|---|---|---|
+| Content-agnostic control | the scientific claim | **GENERIC** — an input-level perturbation moved the self-read signal **5× (GPT-2) to 48× (Qwen)** more than an activation-level one. The self-report tracks the input, not the computation. **Anomaly detector, not introspection.** (E5) | ✅ |
+| Tool-call recall | ≥ 60% | exact **400/400 (100.0%)**, fuzzy (the question as a user would type it) **348/400 = 87.0%** | ✅ |
+| Abstain under corruption | ≥ 95% | **400/400 = 100%** abstained, every one `digest_mismatch`; a **hand-edited file** also abstained **400/400 = 100%** | ✅ |
+| Reflex latency overhead | ≤ 15% | real 16-token generation, ABBA-interleaved, medians: base 1359.3 ms → attached 1369.2 ms → hook **+0.72%**, one tool call **+1.77%**, reflex evaluation **0.002%** → **layer overhead +0.73%** | ✅ |
+| 400 facts, fix rate > harm rate | the P0 gate | see `e8_gates.json` | ⏳ |
+| Multi-model | 5+ models | see `e8_gates.json` | ⏳ |
+
+**A measurement note worth keeping.** The latency gate first reported
+**28.65%** and failed. The measurement was wrong, not the layer: the hooked
+arm ran a tool call as well, and a tool call runs *its own forward pass*, so
+the tool's price and the layer's overhead were being added together. Split
+apart, the layer's own cost is **+0.73%**. An earlier version of the same
+measurement reported **−98%** — the hooked arm never generated at all, so it
+was "faster than no layer", which is how you spot a measurement that is not
+measuring anything.
+
 ## The write-up
 
 [`PAPER.md`](PAPER.md) is the honest research write-up: what is measured, what

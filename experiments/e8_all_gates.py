@@ -48,14 +48,18 @@ def _p(*a):
 
 
 # ---------------------------------------------------------------- gate: facts
-def gate_facts(model_name: str, limit: int, out: Dict[str, Any]) -> Dict[str, Any]:
+def gate_facts(model_name: str, limit: int, out: Dict[str, Any],
+               control_limit: int = 100) -> Dict[str, Any]:
     from venom.bench.real_bench import make_hf_host, run_correction_bench
 
     model, tok = _load(model_name)
     host = make_hf_host(model, tok)
     res = run_correction_bench(host, model_name=model_name, limit=limit)
-    neutral = run_correction_bench(host, model_name=model_name, limit=limit,
-                                   neutral=True)
+    # The control needs to show the reflex does NOT fire on unmatched keys.
+    # A subset is enough for that and halves the wall clock; it is reported
+    # with its own denominator so nobody has to guess.
+    neutral = run_correction_bench(host, model_name=model_name,
+                                   limit=min(limit, control_limit), neutral=True)
     _p(f"  [{model_name}] n={res['n']} injections={res['injections']}")
     _p(f"    baseline acc {res['baseline_accuracy']} -> venom acc {res['venom_accuracy']}")
     _p(f"    fix {res['fix_rate']}  harm {res['harm_rate']}  "
@@ -74,9 +78,9 @@ def gate_facts(model_name: str, limit: int, out: Dict[str, Any]) -> Dict[str, An
         "fixed": res["fixed"],
         "harmed": res["harmed"],
         "passes_p0_gate": res["passes_p0_gate"],
-        "control": {"injections": neutral["injections"],
-                    "fixed": neutral["fixed"],
-                    "harmed": neutral["harmed"]},
+        "control": {"n": neutral["n"], "injections": neutral["injections"],
+                    "fixed": neutral["fixed"], "harmed": neutral["harmed"],
+                    "note": "the control runs on a subset; its own n is above"},
         "gate": "fix_rate > harm_rate",
     }
 
@@ -379,6 +383,7 @@ def main():
     ap.add_argument("--model", default="gpt2")
     ap.add_argument("--limit", type=int, default=400)
     ap.add_argument("--trials", type=int, default=12)
+    ap.add_argument("--control-limit", type=int, default=100)
     ap.add_argument("--out", default="e8_gates.json")
     args = ap.parse_args()
 
@@ -397,7 +402,8 @@ def main():
         t0 = time.perf_counter()
         try:
             if gate == "facts":
-                res = gate_facts(args.model, args.limit, report)
+                res = gate_facts(args.model, args.limit, report,
+                                 control_limit=args.control_limit)
             elif gate == "multimodel":
                 res = gate_multimodel(args.limit, report)
             elif gate == "latency":
