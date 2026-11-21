@@ -275,6 +275,113 @@ def cmd_dial(args) -> int:
     return 0
 
 
+
+def _prompts(args) -> list:
+    """Prompts from --prompts (comma separated) or --prompts-file."""
+    if getattr(args, "prompts_file", None):
+        with open(args.prompts_file, encoding="utf-8") as fh:
+            return [line.strip() for line in fh if line.strip()]
+    raw = getattr(args, "prompts", "") or ""
+    return [p.strip() for p in raw.split("||") if p.strip()]
+
+
+def cmd_census(args) -> int:
+    """Per-neuron activation census of a host. Read-only."""
+    from venom.surgeon.census import census, dead_units
+
+    model, tok = _load_model(args.model, args.dtype)
+    prompts = _prompts(args)
+    if not prompts:
+        print("no prompts: use --prompts 'a||b' or --prompts-file f.txt",
+              file=sys.stderr)
+        return 2
+    out = census(model, tok, prompts, ffn_only=not args.all_modules)
+    if not out.get("ok"):
+        print(json.dumps(out, indent=2))
+        return 1
+    dead = dead_units(out, args.threshold)
+    print(json.dumps({
+        "model": args.model,
+        "samples": out["samples"],
+        "summary": out["summary"],
+        "dead_modules": {k: len(v) for k, v in dead.items()},
+        "dead_units": dead,
+        "caveat": out["caveat"],
+        "note": "read-only: nothing was modified",
+    }, indent=2, default=str))
+    return 0
+
+
+def cmd_kill(args) -> int:
+    """Kill dead neurons, then verify on a disjoint held-out set."""
+    from venom.surgeon.kill import kill_dead_neurons
+    from venom.surgeon.write import WriteAccess
+
+    model, tok = _load_model(args.model, args.dtype)
+    plan, held = _prompts(args), _prompts_heldout(args)
+    if not plan or not held:
+        print("both a calibration set and a DISJOINT held-out set are required",
+              file=sys.stderr)
+        return 2
+    write = WriteAccess(model, label=args.model)
+    out = kill_dead_neurons(model, tok, plan, held, mode=args.mode,
+                            threshold=args.threshold,
+                            drift_threshold=args.drift_threshold,
+                            write=write)
+    print(json.dumps(out, indent=2, default=str))
+    return 0 if out.get("ok") else 1
+
+
+def _prompts_heldout(args) -> list:
+    if getattr(args, "heldout_file", None):
+        with open(args.heldout_file, encoding="utf-8") as fh:
+            return [line.strip() for line in fh if line.strip()]
+    raw = getattr(args, "heldout", "") or ""
+    return [p.strip() for p in raw.split("||") if p.strip()]
+
+
+def cmd_install(args) -> int:
+    """Install VENOM into a model directory: the model becomes addressable."""
+    from venom.install import install, is_installed
+
+    path = args.path
+    if not os.path.isdir(path):
+        # treat it as a hub id: fetch it and save it next to itself
+        model, tok = _load_model(path, args.dtype)
+        os.makedirs(path, exist_ok=True)
+        model.save_pretrained(path)
+        tok.save_pretrained(path)
+    out = install(path, label=args.label)
+    print(json.dumps(out, indent=2, default=str))
+    return 0 if out.get("ok") else 1
+
+
+def cmd_write(args) -> int:
+    """Inspect or use the full write surface of a model."""
+    from venom.surgeon.write import WriteAccess
+
+    model, tok = _load_model(args.model, args.dtype)
+    write = WriteAccess(model, label=args.model)
+    if args.action == "describe":
+        print(json.dumps(write.describe(), indent=2, default=str))
+        return 0
+    if args.action == "journal":
+        print(json.dumps({"journal": write.journal()}, indent=2, default=str))
+        return 0
+    if not args.target:
+        print("--target is required for a mutation", file=sys.stderr)
+        return 2
+    units = [int(u) for u in (args.units.split(",") if args.units else [])]
+    if args.action == "zero_units":
+        out = write.zero_units(args.target, units)
+    elif args.action == "remove_units":
+        out = write.remove_units(args.target, units)
+    else:
+        out = {"ok": False, "error": "unknown_action", "action": args.action}
+    print(json.dumps(out, indent=2, default=str))
+    return 0 if out.get("ok") else 1
+
+
 # ------------------------------------------------------------------- parser
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="venom", description=__doc__.split("\n")[0])
@@ -344,6 +451,44 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--session", default="default")
     s.add_argument("--dtype", default="auto")
     s.set_defaults(func=cmd_chat)
+
+    s = sub.add_parser("census", help="per-neuron activation census of a host")
+    s.add_argument("--model", required=True)
+    s.add_argument("--dtype", default="auto")
+    s.add_argument("--prompts", default="", help="prompt set, separated by ||")
+    s.add_argument("--prompts-file", default=None)
+    s.add_argument("--threshold", type=float, default=0.0,
+                   help="a unit is a candidate below this firing rate; 0 = exactly zero")
+    s.add_argument("--all-modules", action="store_true",
+                   help="census every projection, not just the FFN expansions")
+    s.set_defaults(func=cmd_census)
+
+    s = sub.add_parser("kill", help="remove dead neurons, verify on held-out data")
+    s.add_argument("--model", required=True)
+    s.add_argument("--dtype", default="auto")
+    s.add_argument("--prompts", default="", help="CALIBRATION set, separated by ||")
+    s.add_argument("--prompts-file", default=None)
+    s.add_argument("--heldout", default="", help="HELD-OUT set, disjoint from above")
+    s.add_argument("--heldout-file", default=None)
+    s.add_argument("--mode", default="zero", choices=["zero", "remove"])
+    s.add_argument("--threshold", type=float, default=0.0)
+    s.add_argument("--drift-threshold", type=float, default=0.0)
+    s.set_defaults(func=cmd_kill)
+
+    s = sub.add_parser("install", help="install VENOM into a model directory")
+    s.add_argument("path", help="a local model directory or a hub id")
+    s.add_argument("--label", default="host")
+    s.add_argument("--dtype", default="auto")
+    s.set_defaults(func=cmd_install)
+
+    s = sub.add_parser("write", help="the full write surface of a model")
+    s.add_argument("--model", required=True)
+    s.add_argument("--dtype", default="auto")
+    s.add_argument("--action", default="describe",
+                   choices=["describe", "journal", "zero_units", "remove_units"])
+    s.add_argument("--target", default=None)
+    s.add_argument("--units", default="", help="comma separated unit indices")
+    s.set_defaults(func=cmd_write)
 
     s = sub.add_parser("dial", help="apply a bounded self-edit and measure the drift")
     s.add_argument("--model", required=True)

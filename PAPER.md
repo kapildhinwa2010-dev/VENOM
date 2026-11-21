@@ -293,6 +293,52 @@ threshold (1.5) was chosen before the run, but a single scalar on a single
 prompt is weak evidence in either direction. The localisation result is
 stronger because it is exact on two architectures.
 
+## 8b. The surgery stack (v0.5.0)
+
+The plan's "dead neuron removal" is implemented end to end, and it is the one
+part of VENOM that permanently changes what the host model *is*.
+
+The **census** is per-neuron, not per-layer: for every FFN unit it counts
+how many prompts made that unit fire, and it separates *exactly-dead* (fired
+on zero samples) from *rarely-active* (fired on fewer than 1% of samples).
+Those are different claims, and collapsing them is how a prune ends up
+removing something that mattered.
+
+The **write surface** is unrestricted by design, and says so out loud: every
+mutation is journaled and snapshotted, and a shape rewrite is undoable
+because the pre-rewrite modules are kept. What it offers is *reversibility
+and an audit trail*, **not prevention**.
+
+The **killer** is the plan's gate, unchanged: calibrate on one prompt set,
+apply, verify the drift on a **disjoint** held-out set, roll back if the
+drift is over the threshold. A prune that cannot be verified is not kept.
+
+**Measured on real GPT-2:**
+
+| | Result |
+|---|---|
+| Census: 12 prompts, 36 864 FFN units | **0** exactly-dead, **0** rarely-active |
+| Kill on real GPT-2 | **refused** - nothing was dead, nothing was modified |
+| Kill on a controlled fixture (12 units zeroed on purpose) | found all 12, removed them, drift **0.0**, top-1 agreement **1.0** |
+| Shape rewrite (`mode="remove"`), 8 units of `mlp.c_fc` | `3072 → 3064`, consumer `mlp.c_proj` reshaped with it, model still runs, drift **0.2255**, top-1 agreement **1.0** |
+| Restore after the shape rewrite | **bit-exact** (drift back to **0.0**) |
+| Install | manifest written, **49** writable modules, **no weight changed** |
+
+The honest reading: **GPT-2 has no dead FFN units at this calibration
+size**, so the killer correctly refuses. The fixture result demonstrates the
+*mechanism*, not a property of the model.
+
+Two bugs found while building this are worth recording, because both would
+have produced a silently broken model:
+
+* **The consumer search was global.** "Modules whose input dim equals the
+  target's output dim" matched the `c_proj` of *every* GPT-2 block, so
+  shrinking one block's FFN shrank all twelve and the model stopped running.
+  The search is now scoped to the target's own parent.
+* **HuggingFace's `Conv1D` caches its sizes** in `nx`/`nf` and uses them to
+  reshape the output. Shrinking the weight without updating them breaks the
+  forward pass.
+
 ## 9. The experiments we still owe
 
 In priority order. Each has a kill criterion attached.
@@ -324,6 +370,7 @@ python experiments/e3_selfread.py            # the self-read tools on a real mod
 python experiments/e4_gated_prune.py         # gated self-surgery
 python experiments/e5_fix_harm.py           # the P0 gate + control
 python experiments/e5_content_agnostic.py   # the content-agnostic control
+python experiments/e6_kill_dead.py           # the surgery stack on a real model
 ```
 
 ## 11. Limitations

@@ -10,6 +10,7 @@ restore / report).
     Tier 1 tools  venom.recall, venom.remember, venom.time_now,
                   venom.uncertainty, venom.check_myself, venom.verify,
                   venom.why, venom.where, venom.dial, venom.audit,
+                  venom.prune, venom.census, venom.kill, venom.write,
                   venom.forget, venom.snapshot, venom.restore, venom.report
     Tier 2 tools  venom.recall, venom.remember, venom.time_now,
                   venom.verify, venom.forget
@@ -83,6 +84,39 @@ INTERVENTION_TOOLS = [
           ["target_path", "units"]),
 ]
 
+# --- Tier 1: surgery tools (the full write surface) ----------------------
+SURGERY_TOOLS = [
+    _tool("venom.census",
+          "Per-neuron activation census of the host: for every FFN unit, how many "
+          "prompts made it fire. Separates exactly-dead units from rarely-active "
+          "ones. Read-only.",
+          {"prompts": {"type": "array", "items": {"type": "string"}},
+           "pattern": {"type": "string"},
+           "ffn_only": {"type": "boolean", "default": True}},
+          ["prompts"]),
+    _tool("venom.kill",
+          "Kill dead neurons in the host. Calibrates on one prompt set, removes the "
+          "units, then measures the drift on a DISJOINT held-out set and rolls back "
+          "if the drift is over the threshold. mode='zero' keeps the shape; "
+          "mode='remove' shrinks the tensors (a real shape rewrite).",
+          {"plan_prompts": {"type": "array", "items": {"type": "string"}},
+           "heldout_prompts": {"type": "array", "items": {"type": "string"}},
+           "mode": {"type": "string", "enum": ["zero", "remove"], "default": "zero"},
+           "threshold": {"type": "number", "default": 0.0},
+           "drift_threshold": {"type": "number", "default": 0.0}},
+          ["plan_prompts", "heldout_prompts"]),
+    _tool("venom.write",
+          "The full write surface: change anything in the host model. Every "
+          "mutation is journaled and snapshotted, and can be rolled back.",
+          {"action": {"type": "string",
+                      "enum": ["describe", "journal", "zero_units", "remove_units",
+                               "set_weight", "set_attr", "restore"]},
+           "target": {"type": "string"},
+           "units": {"type": "array", "items": {"type": "integer"}},
+           "value": {}},
+          ["action"]),
+]
+
 # --- Tier 1 + Tier 2: verification and memory state -----------------------
 STATE_TOOLS = [
     _tool("venom.verify",
@@ -104,7 +138,8 @@ STATE_TOOLS = [
 ]
 
 # The full Tier-1 surface.
-ALL_TOOLS = P0_TOOLS + SELF_READ_TOOLS + INTERVENTION_TOOLS + STATE_TOOLS
+ALL_TOOLS = (P0_TOOLS + SELF_READ_TOOLS + INTERVENTION_TOOLS
+             + SURGERY_TOOLS + STATE_TOOLS)
 
 # Tier-2 surface (API-only hosts: no access to the host's internals).
 TIER2_TOOLS = [

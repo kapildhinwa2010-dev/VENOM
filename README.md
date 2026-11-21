@@ -336,6 +336,44 @@ python experiments/e5_fix_harm.py           # the P0 gate + neutral-memory contr
 
 ---
 
+## The surgery stack (new in v0.5.0)
+
+The plan's "dead neuron removal" is now implemented, end to end, and it comes
+with the write surface it needs.
+
+```bash
+venom census  --model gpt2 --prompts "a||b||c"      # per-neuron census
+venom kill    --model gpt2 --prompts "calib||..." \
+              --heldout "held||..." --mode remove   # kill + verify + roll back
+venom install /path/to/model                        # make it addressable
+venom write   --model gpt2 --action describe        # the full write surface
+```
+
+| Module | What it does |
+|---|---|
+| `venom/surgeon/census.py` | Per-**neuron** activation census. Counts, for every FFN unit, how many prompts made it fire. Separates exactly-dead from rarely-active. |
+| `venom/surgeon/write.py` | The **full write surface**. `zero_units`, `remove_units` (a real shape rewrite), `set_weight`, `set_attr`, `load_state_dict`. Every mutation is journaled and snapshotted; a shape rewrite is undoable. |
+| `venom/surgeon/kill.py` | The killer: census → refuse if nothing is dead → apply → verify the drift on a **disjoint held-out set** → roll back if it is over the threshold. |
+| `venom/install.py` | Installs a `venom.manifest.json` into a model directory: the fingerprint, the writable surface, the capabilities, the guarantees and the non-guarantees. |
+
+Three MCP tools were added: `venom.census`, `venom.kill`, `venom.write`
+(Tier 1 only - they need the host's internals).
+
+**What it is not.** `venom.write` can damage a model. It offers
+*reversibility and an audit trail*, not *prevention*. Pruning buys memory and
+compute, not intelligence.
+
+### Measured on real GPT-2
+
+| | Result |
+|---|---|
+| Census, 12 calibration prompts, 36 864 FFN units | **0** exactly-dead units, **0** rarely-active |
+| Kill on real GPT-2 | correctly **refused** - nothing was dead, nothing was modified |
+| Kill on a controlled fixture (12 units zeroed on purpose) | found all 12, removed them, drift on the held-out set **0.0**, top-1 agreement **1.0** |
+| Shape rewrite, `mode="remove"`, 8 units of `mlp.c_fc` | `3072 → 3064`, consumer `mlp.c_proj` reshaped with it, model still runs, drift **0.2255**, top-1 agreement **1.0** |
+| Restore after the shape rewrite | **bit-exact** - drift back to **0.0** |
+| Install | manifest written, **49** writable modules, **no weight changed**, reload through the manifest gives a working write surface |
+
 ## The write-up
 
 [`PAPER.md`](PAPER.md) is the honest research write-up: what is measured, what

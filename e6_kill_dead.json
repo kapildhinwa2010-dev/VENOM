@@ -1,0 +1,166 @@
+{
+  "model": "gpt2",
+  "sections": {
+    "census_real_model": {
+      "samples": 12,
+      "summary": {
+        "samples": 12,
+        "modules_scanned": 12,
+        "total_units": 36864,
+        "never_fired_units": 0,
+        "never_fired_fraction": 0.0,
+        "modules_with_dead": []
+      },
+      "modules_with_dead_units": {},
+      "rarely_active_units": {
+        "transformer.h.0.mlp.c_fc": 0,
+        "transformer.h.1.mlp.c_fc": 0,
+        "transformer.h.2.mlp.c_fc": 0,
+        "transformer.h.3.mlp.c_fc": 0,
+        "transformer.h.4.mlp.c_fc": 0,
+        "transformer.h.5.mlp.c_fc": 0,
+        "transformer.h.6.mlp.c_fc": 0,
+        "transformer.h.7.mlp.c_fc": 0,
+        "transformer.h.8.mlp.c_fc": 0,
+        "transformer.h.9.mlp.c_fc": 0,
+        "transformer.h.10.mlp.c_fc": 0,
+        "transformer.h.11.mlp.c_fc": 0
+      },
+      "verdict": "no unit fired on exactly zero samples, so there is nothing to kill",
+      "caveat": "A census is only as good as its calibration set. A unit that never fired over these prompts may still fire on others. Nothing here is proof that a unit is dead."
+    },
+    "kill_fixture": {
+      "target": "transformer.h.0.mlp.c_fc",
+      "zeroed_for_fixture": 12,
+      "census_found": {
+        "transformer.h.0.mlp.c_fc": 12
+      },
+      "kill": {
+        "ok": true,
+        "mode": "zero",
+        "threshold": 0.0,
+        "calibration_samples": 12,
+        "heldout_samples": 5,
+        "census_summary": {
+          "samples": 12,
+          "modules_scanned": 12,
+          "total_units": 36864,
+          "never_fired_units": 12,
+          "never_fired_fraction": 0.000326,
+          "modules_with_dead": [
+            "transformer.h.0.mlp.c_fc"
+          ]
+        },
+        "census_caveat": "A census is only as good as its calibration set. A unit that never fired over these prompts may still fire on others. Nothing here is proof that a unit is dead.",
+        "applied": [
+          {
+            "path": "transformer.h.0.mlp.c_fc",
+            "units": 12,
+            "result": {
+              "ok": true,
+              "target": "transformer.h.0.mlp.c_fc",
+              "zeroed_units": 12,
+              "shape_unchanged": true,
+              "snapshot_id": "snap1"
+            }
+          }
+        ],
+        "drift": {
+          "ok": true,
+          "max_abs_logit_delta": 0.0,
+          "mean_abs_logit_delta": 0.0,
+          "top1_agreement": 1.0,
+          "samples": 5
+        },
+        "drift_threshold": 0.0,
+        "rolled_back": false,
+        "verdict": "the change is within the drift threshold on the held-out set and has been kept",
+        "units_removed": 12,
+        "warning": "a drift within the threshold on a held-out set is evidence, not proof of losslessness. Pruning buys memory and compute, not intelligence.",
+        "journal": [
+          {
+            "action": "zero_units",
+            "target": "transformer.h.0.mlp.c_fc",
+            "detail": {
+              "units": 12
+            },
+            "snapshot_id": "snap1"
+          }
+        ]
+      },
+      "note": "the dead units here were created deliberately, so this demonstrates the KILL MECHANISM, not a property of the model"
+    },
+    "shape_rewrite": {
+      "target": "transformer.h.0.mlp.c_fc",
+      "removed_units": 8,
+      "out_features_before": 3072,
+      "out_features_after": 3064,
+      "consumers_reshaped": [
+        "transformer.h.0.mlp.c_proj"
+      ],
+      "siblings_reshaped": [],
+      "model_still_runs": true,
+      "drift": {
+        "ok": true,
+        "max_abs_logit_delta": 0.22546387,
+        "mean_abs_logit_delta": 0.0847561308,
+        "top1_agreement": 1.0,
+        "samples": 5
+      },
+      "drift_after_restore": {
+        "ok": true,
+        "max_abs_logit_delta": 0.0,
+        "mean_abs_logit_delta": 0.0,
+        "top1_agreement": 1.0,
+        "samples": 5
+      },
+      "bit_exact_after_restore": true,
+      "note": "these 8 units were NOT dead, so a real drift is expected and correct - the point is that the rewrite is consistent, the model still runs, and the restore is bit-exact"
+    },
+    "install": {
+      "installed": true,
+      "writable_modules": 49,
+      "fingerprint": {
+        "family": "gpt2",
+        "model_type": "gpt2",
+        "blocks_path": "transformer.h",
+        "num_layers": 12,
+        "hidden_size": 768,
+        "lm_head_path": "get_output_embeddings()",
+        "norm_path": "transformer.ln_f",
+        "discovery_confidence": 1.0
+      },
+      "guarantees": {
+        "install_changes_no_weights": true,
+        "attach_detach_bit_exact": true,
+        "all_mutations_journaled": true,
+        "all_mutations_snapshotted": true,
+        "shape_rewrite_reversible": true
+      },
+      "non_guarantees": [
+        "VENOM does not prevent a caller from damaging the model.",
+        "A drift within the threshold on a held-out set is evidence, not proof.",
+        "Pruning buys memory and compute, not intelligence.",
+        "The census is sample-dependent: a unit that never fired may still fire."
+      ],
+      "mutation": {
+        "ok": true,
+        "target": "transformer.h.0.attn.c_attn",
+        "zeroed_units": 1,
+        "shape_unchanged": true,
+        "snapshot_id": "snap1"
+      },
+      "journal": [
+        {
+          "action": "zero_units",
+          "target": "transformer.h.0.attn.c_attn",
+          "detail": {
+            "units": 1
+          },
+          "snapshot_id": "snap1"
+        }
+      ],
+      "note": "installing changed no weight; the model became addressable"
+    }
+  }
+}

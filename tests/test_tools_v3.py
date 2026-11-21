@@ -21,13 +21,15 @@ def _handlers(**kw):
 # ------------------------------------------------------------------- surface
 def test_the_full_tool_surface_exists():
     names = [t["name"] for t in ALL_TOOLS]
-    assert len(names) == 15
+    assert len(names) == 18
     for expected in ("venom.recall", "venom.remember", "venom.time_now",
                      "venom.uncertainty", "venom.check_myself", "venom.why",
                      "venom.where", "venom.dial", "venom.audit",
                      "venom.verify", "venom.forget", "venom.snapshot",
-                     "venom.restore", "venom.report", "venom.prune"):
+                     "venom.restore", "venom.report", "venom.prune",
+                     "venom.census", "venom.kill", "venom.write"):
         assert expected in names
+    assert len(set(names)) == len(names), "duplicate tool name"
 
 
 def test_tier2_excludes_the_tools_that_need_internals():
@@ -35,6 +37,10 @@ def test_tier2_excludes_the_tools_that_need_internals():
     assert "venom.recall" in names and "venom.verify" in names
     assert "venom.uncertainty" not in names
     assert "venom.check_myself" not in names
+    # the surgery tools need the host's internals, so they are Tier 1 only
+    assert "venom.census" not in names
+    assert "venom.kill" not in names
+    assert "venom.write" not in names
     assert "venom.dial" not in names
 
 

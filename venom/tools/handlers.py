@@ -23,6 +23,7 @@ SELF_READ_TOOLS = (
     "venom.uncertainty", "venom.check_myself", "venom.why", "venom.where",
 )
 INTERVENTION_TOOLS = ("venom.dial", "venom.audit", "venom.prune")
+SURGERY_TOOLS = ("venom.census", "venom.kill", "venom.write")
 
 KNOWN_TOOLS = tuple(t["name"] for t in ALL_TOOLS)
 
@@ -43,7 +44,8 @@ class ToolHandlers:
     def __init__(self, store: MemoryStore, budget: Budget | None = None,
                  probe=None, taps: Optional[Dict[str, Any]] = None,
                  norm=None, lm_head=None, tokenizer=None, dials=None,
-                 rollback=None, report_fn=None, pruner=None, verifier=None):
+                 rollback=None, report_fn=None, pruner=None, verifier=None,
+                 model=None, write=None):
         self.store = store
         self.budget = budget or Budget()
         self.probe = probe
@@ -56,6 +58,8 @@ class ToolHandlers:
         self.report_fn = report_fn
         self.pruner = pruner
         self.verifier = verifier
+        self.model = model
+        self.write = write
 
     # -------------------------------------------------------------- dispatch
     def call(self, name: str, args: Dict[str, Any]) -> dict:
@@ -222,6 +226,72 @@ class ToolHandlers:
         from venom.sensors.audit import audit
         out = audit(self.taps, float(args.get("threshold", 0.001)))
         return {"ok": "error" not in out, **out}
+
+    # --------------------------------------------------------- surgery tools
+    def _t_census(self, args):
+        """Per-neuron activation census. Read-only."""
+        if self.model is None or self.tokenizer is None:
+            return {"ok": False, "error": "no_host_model",
+                    "note": "the census needs the host model attached"}
+        from venom.surgeon.census import census, dead_units
+        prompts = list(args.get("prompts") or [])
+        if not prompts:
+            return {"ok": False, "error": "no_prompts"}
+        cen = census(self.model, self.tokenizer, prompts,
+                     pattern=args.get("pattern"),
+                     ffn_only=bool(args.get("ffn_only", True)))
+        if not cen.get("ok"):
+            return {"ok": False, **cen}
+        threshold = float(args.get("threshold", 0.0))
+        dead = dead_units(cen, threshold)
+        return {"ok": True,
+                "samples": cen["samples"],
+                "summary": cen["summary"],
+                "dead_modules": {k: len(v) for k, v in dead.items()},
+                "dead_units": dead,
+                "caveat": cen["caveat"]}
+
+    def _t_kill(self, args):
+        """Kill dead neurons, then verify on a disjoint held-out set."""
+        if self.model is None or self.tokenizer is None:
+            return {"ok": False, "error": "no_host_model",
+                    "note": "the kill path needs the host model attached"}
+        from venom.surgeon.kill import kill_dead_neurons
+        plan = list(args.get("plan_prompts") or [])
+        held = list(args.get("heldout_prompts") or [])
+        return kill_dead_neurons(
+            self.model, self.tokenizer, plan, held,
+            mode=str(args.get("mode", "zero")),
+            threshold=float(args.get("threshold", 0.0)),
+            drift_threshold=float(args.get("drift_threshold", 0.0)),
+            write=self.write)
+
+    def _t_write(self, args):
+        """The full write surface."""
+        if self.write is None:
+            return {"ok": False, "error": "no_write_surface",
+                    "note": "this host was attached without write access"}
+        action = str(args.get("action", ""))
+        if action == "describe":
+            return {"ok": True, **self.write.describe()}
+        if action == "journal":
+            return {"ok": True, "journal": self.write.journal()}
+        if action == "restore":
+            return self.write.restore()
+        target = args.get("target")
+        if not target:
+            return {"ok": False, "error": "no_target", "action": action}
+        units = [int(u) for u in (args.get("units") or [])]
+        if action == "zero_units":
+            return self.write.zero_units(target, units)
+        if action == "remove_units":
+            return self.write.remove_units(target, units)
+        if action == "set_weight":
+            return self.write.set_weight(target, units, args.get("value"))
+        if action == "set_attr":
+            return self.write.set_attr(target, str(args.get("name", "")),
+                                       args.get("value"))
+        return {"ok": False, "error": "unknown_action", "action": action}
 
     def _t_prune(self, args):
         """Gated self-surgery.

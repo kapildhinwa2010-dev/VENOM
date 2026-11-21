@@ -1,6 +1,6 @@
 [project]
 name = "venomlayer"
-version = "0.4.0"
+version = "0.5.0"
 description = "Training-free middleware that gives an LLM tool access to its own internals"
 readme = "README.md"
 requires-python = ">=3.9"
