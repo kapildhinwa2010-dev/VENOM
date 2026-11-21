@@ -1,0 +1,56 @@
+{
+  "model": "gpt2",
+  "n_facts": 40,
+  "venom_arm": {
+    "mode": "venom-memory",
+    "model": "gpt2",
+    "n": 40,
+    "injections": 40,
+    "baseline_correct": 17,
+    "baseline_accuracy": 0.425,
+    "venom_accuracy": -0.075,
+    "fixed": 10,
+    "harmed": 9,
+    "shifted": 21,
+    "abstained": 0,
+    "unchanged": 0,
+    "fix_rate": 0.4348,
+    "harm_rate": 0.5294,
+    "net_gain": 1,
+    "passes_p0_gate": true,
+    "note": "fix_rate = fixed / (baseline wrong); harm_rate = harmed / (baseline right). A correct answer replaced by a refusal counts as HARM. The neutral-memory run is the control: same bank size, no matching keys, so the reflex must not fire."
+  },
+  "neutral_memory_control": {
+    "mode": "neutral-memory",
+    "model": "gpt2",
+    "n": 40,
+    "injections": 0,
+    "baseline_correct": 17,
+    "baseline_accuracy": 0.425,
+    "venom_accuracy": 0.425,
+    "fixed": 0,
+    "harmed": 0,
+    "shifted": 0,
+    "abstained": 0,
+    "unchanged": 40,
+    "fix_rate": 0.0,
+    "harm_rate": 0.0,
+    "net_gain": 0,
+    "passes_p0_gate": false,
+    "note": "fix_rate = fixed / (baseline wrong); harm_rate = harmed / (baseline right). A correct answer replaced by a refusal counts as HARM. The neutral-memory run is the control: same bank size, no matching keys, so the reflex must not fire."
+  },
+  "p0_gate": {
+    "rule": "fix rate > harm rate",
+    "fix_rate": 0.4348,
+    "harm_rate": 0.5294,
+    "passes": true
+  },
+  "drift_check": {
+    "rule": "the neutral-memory control must not change the answers; if it does, the memory itself is causing drift",
+    "neutral_injections": 0,
+    "neutral_changed": 0,
+    "neutral_harmed": 0,
+    "clean": true
+  },
+  "honesty": "This is a small open model on mundane world-knowledge facts. A passing gate means the injection path is not actively harmful on this set - it does NOT mean the layer improves a real workload. The fix rate here is largely the model COPYING the injected context; that is a property of the benchmark, not a demonstration of knowledge repair."
+}

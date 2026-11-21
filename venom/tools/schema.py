@@ -73,6 +73,14 @@ INTERVENTION_TOOLS = [
           "Report-only health check of the host: dead neurons, redundant layers, "
           "compressible layers. Never modifies weights.",
           {"threshold": {"type": "number", "default": 0.001}}),
+    _tool("venom.prune",
+          "Gated self-surgery. Zeroes dead units, then verifies the drift on a "
+          "held-out set; if the drift is not within the threshold the weights "
+          "are restored automatically. Requires an explicit opt-in.",
+          {"target_path": {"type": "string"},
+           "units": {"type": "array", "items": {"type": "integer"}},
+           "threshold": {"type": "number", "default": 0.001}},
+          ["target_path", "units"]),
 ]
 
 # --- Tier 1 + Tier 2: verification and memory state -----------------------

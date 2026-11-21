@@ -171,7 +171,7 @@ def test_runtime_note_answer_rearms_the_budget():
 
 def test_runtime_tool_defs_are_mcp_shaped():
     tools = VenomRuntime.tool_defs()
-    assert len(tools) == 14
+    assert len(tools) == 15
     for t in tools:
         assert t["name"].startswith("venom.")
         assert "inputSchema" in t

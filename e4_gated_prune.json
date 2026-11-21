@@ -1,0 +1,18 @@
+{
+  "model": "gpt2",
+  "result": "no_prunable_units",
+  "plan_set_size": 10,
+  "heldout_set_size": 10,
+  "threshold": 0.001,
+  "rarest_units": [
+    {
+      "path": "lm_head",
+      "rarest_rate": 1.0,
+      "p10_rate": 1.0,
+      "median_rate": 1.0,
+      "units": 50257
+    }
+  ],
+  "interpretation": "No unit stayed below the activation threshold over the plan set. This is a finding, not a failure: a small model with dense activations has no dead units to prune at this sample count. The plan's P5 gate assumes 10k prompts; 10 prompts cannot establish that a unit is dead.",
+  "weights_modified": false
+}

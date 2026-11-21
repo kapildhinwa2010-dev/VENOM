@@ -22,7 +22,7 @@ STATE_TOOLS = ("venom.snapshot", "venom.restore", "venom.report")
 SELF_READ_TOOLS = (
     "venom.uncertainty", "venom.check_myself", "venom.why", "venom.where",
 )
-INTERVENTION_TOOLS = ("venom.dial", "venom.audit")
+INTERVENTION_TOOLS = ("venom.dial", "venom.audit", "venom.prune")
 
 KNOWN_TOOLS = tuple(t["name"] for t in ALL_TOOLS)
 
@@ -43,7 +43,7 @@ class ToolHandlers:
     def __init__(self, store: MemoryStore, budget: Budget | None = None,
                  probe=None, taps: Optional[Dict[str, Any]] = None,
                  norm=None, lm_head=None, tokenizer=None, dials=None,
-                 rollback=None, report_fn=None):
+                 rollback=None, report_fn=None, pruner=None, verifier=None):
         self.store = store
         self.budget = budget or Budget()
         self.probe = probe
@@ -54,6 +54,8 @@ class ToolHandlers:
         self.dials = dials
         self.rollback = rollback
         self.report_fn = report_fn
+        self.pruner = pruner
+        self.verifier = verifier
 
     # -------------------------------------------------------------- dispatch
     def call(self, name: str, args: Dict[str, Any]) -> dict:
@@ -84,7 +86,18 @@ class ToolHandlers:
         return {"ok": r.status == "hit", **r.as_dict()}
 
     def _t_remember(self, args):
-        return self.store.remember(args.get("key", ""), args.get("value", ""))
+        out = self.store.remember(args.get("key", ""), args.get("value", ""))
+        # `persistent: true` means "also write it to the on-disk store". If
+        # this store has no persist_path, say so rather than pretending.
+        if args.get("persistent") and out.get("ok"):
+            if getattr(self.store, "persist_path", None):
+                out["persistent"] = True
+                out["path"] = self.store.persist_path
+            else:
+                out["persistent"] = False
+                out["note"] = ("this session has no persistent store configured; "
+                               "the fact lives in memory only")
+        return out
 
     def _t_time_now(self, args):
         return {"ok": True, "utc": datetime.now(timezone.utc).isoformat(),
@@ -92,13 +105,8 @@ class ToolHandlers:
 
     def _t_forget(self, args):
         """The memory is not append-only - facts can be retracted."""
-        key = args.get("key", "")
-        from venom.memory.store import norm
-        k = norm(key)
-        if k not in self.store._data:
-            return {"ok": False, "error": "not_found", "key": k}
-        del self.store._data[k]
-        return {"ok": True, "key": k, "forgotten": True}
+        out = self.store.delete(args.get("key", ""))
+        return out
 
     def _t_verify(self, args):
         """Check an answer against stored memory.
@@ -214,3 +222,33 @@ class ToolHandlers:
         from venom.sensors.audit import audit
         out = audit(self.taps, float(args.get("threshold", 0.001)))
         return {"ok": "error" not in out, **out}
+
+    def _t_prune(self, args):
+        """Gated self-surgery.
+
+        Requires a PruneManager and a verifier. The prune is applied, then
+        the drift is measured on a held-out set; anything above the
+        threshold restores the weights automatically.
+        """
+        if self.pruner is None:
+            return {"ok": False, "error": "no_prune_manager",
+                    "note": "self-surgery is not enabled for this host"}
+        verifier = self.verifier
+        if verifier is None:
+            return {"ok": False, "error": "no_verifier",
+                    "note": ("a prune is never accepted without a verifier that "
+                             "measures the drift on a held-out set")}
+        from venom.surgeon.prune import PrunePlan
+
+        units = [int(u) for u in (args.get("units") or [])]
+        if not units:
+            return {"ok": False, "error": "no_units"}
+        plan = PrunePlan(
+            target_path=args.get("target_path", ""),
+            layer_name="",
+            unit_indices=units,
+            total_units=units and max(units) + 1 or 0,
+            fraction=0.0,
+            reason="requested via venom.prune",
+        )
+        return self.pruner.prune_with_gate(plan, verifier)

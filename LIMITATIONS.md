@@ -1,4 +1,4 @@
-# LIMITATIONS — measured vs claimed (v0.3.0)
+# LIMITATIONS — measured vs claimed (v0.4.0)
 
 Every number in this file is either **measured** (with the command that produced it) or
 **not measured**. Nothing here is a prediction dressed as a result.
@@ -141,6 +141,17 @@ Each of these was confirmed by a reproducing script, not suspected.
    The claim "works on any model" is a *mechanism* claim — the discoverer does
    not look up a table — but it has been exercised on three.
 
+## 2b. v0.4.0 measured results
+
+| Claim | How | Result |
+|---|---|---|
+| **Architecture sweep** | `experiments/e2b_architecture_sweep.py` | ✅ **22 of 30** models discovered across **18 families** (gpt2, gpt_neo, gpt_neox, gptj, opt, bloom, mistral, llama, qwen2, qwen3, phi, phi3, olmo2, falcon, starcoder2, stablelm, granite, codegen). All 8 failures were **access** problems (4 gated repos, 3 renamed repos, 1 missing dependency) — **zero discovery failures** |
+| **The P0 gate on a real host** | `experiments/e5_fix_harm.py --model gpt2` | ✅ fix rate **0.417** > harm rate **0.375** (n=20). Baseline accuracy 0.40 → VENOM accuracy 0.45 |
+| **Neutral-memory control** | same run | ✅ **clean**: 0 injections, 0 changed, 0 harmed. The memory itself causes no drift on this set |
+| **Gated self-surgery refuses when it must** | `experiments/e4_gated_prune.py --model gpt2` | ✅ **no unit prunable** — every unit of every projection fired at least once over the plan prompts, so the gate refused |
+| **Persistent memory survives a restart** | CLI `remember --persist` / `recall --persist` | ✅ written in one process, read in another |
+| **A tampered persistent file abstains** | same | ✅ hand-edited value → `status: abstain`, `reason: digest_mismatch` |
+
 ## 4c. v0.3.0 tool-surface limitations
 
 1. **The self-read numbers are self-reports about a computation, not about
@@ -166,6 +177,31 @@ Each of these was confirmed by a reproducing script, not suspected.
 6. **The P3 ablation is a plumbing check, not a result.** The e3 experiment
    compares one prompt with and without an uncertainty hint. It is not a
    benchmark and its outcome must not be quoted as a number.
+
+## 4d. v0.4.0 limitations
+
+1. **The P0 gate result is narrow.** 20 facts, one 124M model, mundane world
+   knowledge. The fix rate is largely the model *copying the injected
+   context*. It does not show knowledge repair, and it does not show the
+   layer helps on a real workload. The plan asks for 400 facts.
+2. **The architecture sweep uses meta-device construction.** The module
+   *graph* is real; the weights are not. It proves the discoverer finds
+   unfamiliar structures. It does NOT prove a forward pass on those
+   architectures is bit-exact — that is `e2_universal_attach.py`, on real
+   weights, for three architectures.
+3. **The sweep's failures were access failures.** 4 gated repos (Llama-3,
+   Gemma-2, Gemma-3) and 3 renamed repos could not be fetched at all. That
+   says nothing about the discoverer, but it does mean those families are
+   **unverified**.
+4. **No pruning was performed.** 10 prompts cannot establish that a unit is
+   dead; the plan's P5 gate assumes 10k prompts. The gate refusing is the
+   correct behaviour, not a missing feature.
+5. **The integrations are optional and untested against every sibling's own
+   test suite.** They are adapters that call the real code; they are not a
+   port of it.
+6. **`venom.remember(persistent=true)` was advertised but did nothing** until
+   v0.4.0. The schema is now honest about it, and the fact survives a
+   restart.
 
 ## 5. Claims deliberately not made
 

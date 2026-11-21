@@ -1,4 +1,4 @@
-# 🐍 THE VENOM-PARASITE — v0.3.0
+# 🐍 THE VENOM-PARASITE — v0.4.0
 
 **A plug-in layer for any AI.** Training-free middleware that gives a model
 memory, a clock, and read-access to its own forward pass — without changing
@@ -60,6 +60,31 @@ Every one of these carries its own caveat in the payload. `check_myself` in
 particular states that layer agreement is **not** introspection — a supervised
 probe beats a model's own self-report 98.3% to 11.1% (arXiv 2611.15267) and
 activation-level detection is content-agnostic (arXiv 2603.05414).
+
+### The P0 gate, measured on a real host
+
+`python experiments/e5_fix_harm.py --model gpt2`:
+
+| | fix rate | harm rate | baseline acc | venom acc |
+|---|---|---|---|---|
+| VENOM arm | **0.417** | **0.375** | 0.40 | 0.45 |
+| neutral-memory control | 0.0 | 0.0 | 0.40 | 0.40 |
+
+The gate is *"fix rate > harm rate"* — it passes. The **neutral-memory
+control is clean**: the same bank of facts, stored under keys that match
+nothing, changed **zero** answers. Without that control, the fix rate could
+just be "any extra text helps".
+
+**What this does not show:** that the layer improves a real workload. A small
+model on mundane world-knowledge facts, where the fix rate is largely the
+model *copying the injected context*. That is a property of the benchmark.
+
+### Gated self-surgery
+
+`python experiments/e4_gated_prune.py --model gpt2` — **no unit was prunable.**
+Every unit of every projection fired at least once over the 10 plan prompts,
+so the gate refused to prune. That is the correct outcome: the plan's P5 gate
+assumes 10k prompts, and 10 prompts cannot establish that a unit is dead.
 
 ### Bounded self-edit, measured on a real GPT-2
 
@@ -133,7 +158,9 @@ venom tools                         # print the MCP schemas
 
 | | |
 |---|---|
-| Test suite | ✅ **155/155 pass** (89 core + 19 universal + 27 tools + 18 dials) |
+| Test suite | ✅ **179/179 pass** (core + universal + tools + dials + prune + integrations) |
+| **Architecture sweep** | ✅ **22 of 30** models discovered across **18 distinct families** — every failure was an access problem (gated/renamed repo), **zero discovery failures** |
+| **Sibling-repo integration** | ✅ **20 sibling repos** wired as optional adapters; VENOM still runs with none installed |
 | **Bit-exact attach → detach on real models** | ✅ **GPT-2 124M, Qwen2.5-0.5B-Instruct, SmolLM2-135M-Instruct** — `bit_exact_during=true`, `bit_exact_after_detach=true`, identical logits hash |
 | Architecture discovery | ✅ **no hardcoded paths** — blocks/head/norm found by walking the module graph; `confidence` reported |
 | MCP stdio server | ✅ JSON-RPC 2.0 conformance tested (notification vs request, id preservation, error codes) |
@@ -184,6 +211,7 @@ $ venom fingerprint --model gpt2
 
 ```
 venom/
+├── integrations/        ★ 20 sibling repos as optional adapters
 ├── core/
 │   ├── discovery.py     ★ universal architecture discovery (no hardcoded paths)
 │   ├── runtime.py       ★ the framework-agnostic core (VenomRuntime)
@@ -203,7 +231,8 @@ venom/
 ├── report/compiler.py   telemetry → natural language
 ├── verify/              drift (fixed/harmed/shifted/abstained), rollback
 ├── surgeon/report.py    dead-neuron analysis — report only, never edits weights
-├── bench/               fix-rate vs harm-rate harness
+├── surgeon/prune.py     ★ gated self-surgery: apply -> verify -> restore
+├── bench/               fix-rate vs harm-rate harness + the fact set
 ├── server.py            MCP JSON-RPC 2.0 stdio server
 └── standalone.py        ★ single-file drop-in, no install
 ```
@@ -300,6 +329,9 @@ python experiments/e1_bus_detach.py         # bit-exactness + latency (GPT-2)
 python experiments/e1b_latency_isolated.py   # randomised A/B latency isolation
 python experiments/e2_universal_attach.py    # universal attach across 3 architectures
 python experiments/e3_selfread.py            # the self-read tools on a real model
+python experiments/e2b_architecture_sweep.py # 30 architectures, meta-device
+python experiments/e4_gated_prune.py         # gated self-surgery + drift proof
+python experiments/e5_fix_harm.py           # the P0 gate + neutral-memory control
 ```
 
 ---

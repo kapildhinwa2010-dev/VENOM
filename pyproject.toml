@@ -13,6 +13,29 @@ venom = "venom.shell.cli:main"
 [project.optional-dependencies]
 torch = ["torch", "transformers", "numpy"]
 dev = ["pytest"]
+# The sibling repos named in the master plan's TABLE 2. They are OPTIONAL:
+# VENOM installs and runs with none of them, and every adapter degrades to
+# {"ok": False, ...} when its sibling is absent.
+integrations = [
+  "never-lie @ git+https://github.com/kapildhinwa2010-dev/NEVER_LIE.git",
+  "factbase @ git+https://github.com/kapildhinwa2010-dev/FactBase.git",
+  "know-vault @ git+https://github.com/kapildhinwa2010-dev/KNOW-VAULT.git",
+  "fluidtech @ git+https://github.com/kapildhinwa2010-dev/fluidtech.git",
+  "inner-vote @ git+https://github.com/kapildhinwa2010-dev/INNER-VOTE-.git",
+  "logit-stream @ git+https://github.com/kapildhinwa2010-dev/LOGIT-STREAM.git",
+  "state-mirror @ git+https://github.com/kapildhinwa2010-dev/STATE-MIRROR.git",
+  "variance-lies @ git+https://github.com/kapildhinwa2010-dev/VARIEANCE-LIES.git",
+  "layer-census @ git+https://github.com/kapildhinwa2010-dev/LAYER-CENSUS-.git",
+  "dead-cell @ git+https://github.com/kapildhinwa2010-dev/DEAD-CELL.git",
+  "twin-tower @ git+https://github.com/kapildhinwa2010-dev/TWIN-TOWER.git",
+  "skip-run @ git+https://github.com/kapildhinwa2010-dev/SKIP-RUN-.git",
+  "powerlaw-probe @ git+https://github.com/kapildhinwa2010-dev/POWERLAW-PROBE.git",
+  "bus-trace @ git+https://github.com/kapildhinwa2010-dev/BUS-TRACE.git",
+  "trace-path @ git+https://github.com/kapildhinwa2010-dev/TRACE-PATH.git",
+  "geometry-scan @ git+https://github.com/kapildhinwa2010-dev/GEOMETRY-SCAN.git",
+  "noise-storm @ git+https://github.com/kapildhinwa2010-dev/NOISE-STORM.git",
+  "tmu @ git+https://github.com/kapildhinwa2010-dev/TMU.git",
+]
 
 [build-system]
 requires = ["setuptools>=61"]

@@ -26,7 +26,17 @@ import torch
 import torch.nn as nn
 
 ATTN_NAMES = ("attn", "attention", "self_attn", "cross_attn")
-MLP_NAMES = ("mlp", "feed_forward", "ffn", "feed_forward_net", "w1")
+# The MLP side of a block has many names across architectures. OPT calls it
+# fc1/fc2, GPT-Neo calls it mlp, Llama calls it mlp, Falcon calls it
+# transformer.h -> mlp, CodeGen calls it mlp, BLOOM calls it mlp, MPT calls
+# it up_proj/down_proj. Missing one makes the whole architecture
+# undiscoverable, so the list has to be generous.
+MLP_NAMES = (
+    "mlp", "feed_forward", "ffn", "feed_forward_net", "gated_mlp",
+    "fc1", "fc2", "fc3", "dense", "dense_h_to_4h", "dense_4h_to_h",
+    "up_proj", "down_proj", "gate_proj", "w1", "w2", "w3",
+    "transformer.h", "output_dense", "ffn_block",
+)
 NAME_HINTS = ("layers", "blocks", "h", "decoder")
 
 

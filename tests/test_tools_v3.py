@@ -21,12 +21,12 @@ def _handlers(**kw):
 # ------------------------------------------------------------------- surface
 def test_the_full_tool_surface_exists():
     names = [t["name"] for t in ALL_TOOLS]
-    assert len(names) == 14
+    assert len(names) == 15
     for expected in ("venom.recall", "venom.remember", "venom.time_now",
                      "venom.uncertainty", "venom.check_myself", "venom.why",
                      "venom.where", "venom.dial", "venom.audit",
                      "venom.verify", "venom.forget", "venom.snapshot",
-                     "venom.restore", "venom.report"):
+                     "venom.restore", "venom.report", "venom.prune"):
         assert expected in names
 
 

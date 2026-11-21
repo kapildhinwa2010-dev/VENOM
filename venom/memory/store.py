@@ -9,7 +9,10 @@ Design rules:
 from __future__ import annotations
 
 import hashlib
+import json
+import os
 import re
+import tempfile
 from collections import OrderedDict
 from dataclasses import asdict, dataclass
 from typing import Optional
@@ -48,7 +51,8 @@ class Recall:
 class MemoryStore:
     """Bounded, LRU, digest-guarded exact memory. No fuzzy match, no guessing."""
 
-    def __init__(self, capacity: int = 1024, session_id: str = "default"):
+    def __init__(self, capacity: int = 1024, session_id: str = "default",
+                 persist_path: Optional[str] = None):
         if capacity < 1:
             raise ValueError("capacity must be >= 1")
         self.capacity = capacity
@@ -56,6 +60,11 @@ class MemoryStore:
         self._data: "OrderedDict[str, dict]" = OrderedDict()
         self.evictions = 0
         self.corruptions = 0
+        # v0.3.1: optional on-disk persistence. The `persistent` flag in the
+        # venom.remember tool schema used to be accepted and then ignored.
+        self.persist_path = persist_path
+        if persist_path:
+            self._load_persisted()
 
     def remember(self, key: str, value: str) -> dict:
         k = norm(key)
@@ -67,6 +76,8 @@ class MemoryStore:
         while len(self._data) > self.capacity:
             self._data.popitem(last=False)
             self.evictions += 1
+        if self.persist_path:
+            self._persist()
         return {"ok": True, "key": k, "digest": digest(value)}
 
     def has(self, key: str) -> bool:
@@ -84,6 +95,62 @@ class MemoryStore:
             return Recall("abstain", reason="digest_mismatch", key=k)
         self._data.move_to_end(k)
         return Recall("hit", value=rec["value"], reason="exact", key=k)
+
+    def delete(self, key: str) -> dict:
+        """Remove a fact. The memory is not append-only."""
+        k = norm(key)
+        if k not in self._data:
+            return {"ok": False, "error": "not_found", "key": k}
+        del self._data[k]
+        if self.persist_path:
+            self._persist()
+        return {"ok": True, "key": k, "forgotten": True}
+
+    def _persist(self) -> None:
+        """Write the store to disk atomically.
+
+        The persisted digest is the one the value had when it was written. If
+        the file is edited by hand, the recall abstains instead of returning
+        the tampered value.
+        """
+        if not self.persist_path:
+            return
+        blob = {
+            "version": 1,
+            "session_id": self.session_id,
+            "capacity": self.capacity,
+            "memory": [
+                {"key": k, "value": v["value"], "digest": v["digest"]}
+                for k, v in self._data.items()
+            ],
+        }
+        directory = os.path.dirname(os.path.abspath(self.persist_path)) or "."
+        os.makedirs(directory, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=directory, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                json.dump(blob, fh, indent=2, default=str)
+            os.replace(tmp, self.persist_path)
+        except Exception:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+            raise
+
+    def _load_persisted(self) -> None:
+        """Load a persisted store, keeping the persisted digests."""
+        if not self.persist_path or not os.path.exists(self.persist_path):
+            return
+        try:
+            with open(self.persist_path, encoding="utf-8") as fh:
+                blob = json.load(fh)
+        except Exception:  # noqa: BLE001 - a broken file must not kill the host
+            self.corruptions += 1
+            return
+        self.capacity = int(blob.get("capacity", self.capacity))
+        for entry in blob.get("memory", []):
+            # restore() keeps the PERSISTED digest so a hand-edited file
+            # abstains instead of returning the tampered value
+            self.restore(entry["key"], entry["value"], entry.get("digest"))
 
     def corrupt_for_test(self, key: str, new_value: str) -> None:
         """Deliberately break the digest. Used by the abstain benchmark."""

@@ -48,6 +48,9 @@ class VenomConfig:
     min_key_words: int = 2
     min_key_chars: int = 6
     session_id: str = "default"
+    # Optional on-disk memory. When set, `venom.remember` with
+    # persistent=true writes here and the facts survive a restart.
+    persist_path: Optional[str] = None
     # The reflex may rewrite the prompt (memory injection). Set False for hosts
     # that call tools themselves - there the reflex only *advises*.
     inject_memory: bool = True
@@ -64,7 +67,9 @@ class VenomRuntime:
     def __init__(self, config: Optional[VenomConfig] = None, store: Optional[MemoryStore] = None):
         self.config = config or VenomConfig()
         self.store = store or MemoryStore(
-            capacity=self.config.memory_capacity, session_id=self.config.session_id
+            capacity=self.config.memory_capacity,
+            session_id=self.config.session_id,
+            persist_path=self.config.persist_path,
         )
         self.budget = Budget(max_calls=self.config.max_calls)
         self.reflex = Reflex(
@@ -95,10 +100,13 @@ class VenomRuntime:
         self.tokenizer = None
         self.dials = None
         self.rollback = None
+        self.pruner = None
+        self.verifier = None
 
     # -------------------------------------------------------- host wiring
     def bind_host(self, *, probe=None, taps_provider=None, norm=None,
-                  lm_head=None, tokenizer=None, dials=None, rollback=None) -> "VenomRuntime":
+                  lm_head=None, tokenizer=None, dials=None, rollback=None,
+                  pruner=None, verifier=None) -> "VenomRuntime":
         """Give the runtime access to a host's internals.
 
         A probe that is not attached yet is attached here - the host owns the
@@ -116,6 +124,8 @@ class VenomRuntime:
         self.tokenizer = tokenizer
         self.dials = dials
         self.rollback = rollback
+        self.pruner = pruner
+        self.verifier = verifier
         return self
         return self
 
@@ -157,6 +167,8 @@ class VenomRuntime:
             dials=self.dials,
             rollback=self.rollback,
             report_fn=self.report,
+            pruner=self.pruner,
+            verifier=self.verifier,
         )
 
     def call_tool(self, name: str, args: Dict[str, Any]) -> dict:

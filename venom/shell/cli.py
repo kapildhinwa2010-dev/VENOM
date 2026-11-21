@@ -130,11 +130,13 @@ def cmd_proxy(args) -> int:
 
 
 def cmd_remember(args) -> int:
-    runtime = VenomRuntime(VenomConfig(session_id=args.session))
+    runtime = VenomRuntime(VenomConfig(session_id=args.session,
+                                        persist_path=args.persist))
     out = runtime.remember(args.key, args.value)
+    if args.persist:
+        out["persistent"] = True
+        out["path"] = args.persist
     if args.memory:
-        sess = runtime.store
-        sess.remember(args.key, args.value)
         with open(args.memory, "w", encoding="utf-8") as fh:
             json.dump({args.key: args.value}, fh, indent=2)
     print(json.dumps(out, indent=2))
@@ -142,7 +144,8 @@ def cmd_remember(args) -> int:
 
 
 def cmd_recall(args) -> int:
-    runtime = VenomRuntime(VenomConfig(session_id=args.session))
+    runtime = VenomRuntime(VenomConfig(session_id=args.session,
+                                        persist_path=args.persist))
     if args.memory and os.path.exists(args.memory):
         with open(args.memory, encoding="utf-8") as fh:
             for k, v in json.load(fh).items():
@@ -307,12 +310,15 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("key")
     s.add_argument("value")
     s.add_argument("--memory", default=None, help="write the fact to this json file")
+    s.add_argument("--persist", default=None,
+                   help="persistent store path (facts survive a restart)")
     s.add_argument("--session", default="default")
     s.set_defaults(func=cmd_remember)
 
     s = sub.add_parser("recall", help="read a fact back")
     s.add_argument("key")
     s.add_argument("--memory", default=None, help="read facts from this json file")
+    s.add_argument("--persist", default=None, help="persistent store path to read")
     s.add_argument("--session", default="default")
     s.set_defaults(func=cmd_recall)
 
