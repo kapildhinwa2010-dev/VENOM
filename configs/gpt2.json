@@ -1,0 +1,25 @@
+{
+  "model": "gpt2",
+  "family": "gpt2",
+  "model_type": "gpt2",
+  "blocks_path": "transformer.h",
+  "num_layers": 12,
+  "lm_head_path": "get_output_embeddings()",
+  "norm_path": "transformer.ln_f",
+  "confidence": 1.0,
+  "note": "Generated from a real fingerprint (meta-device build) by scripts/gen_configs.py",
+  "mcp": {
+    "transport": "stdio",
+    "command": "venom",
+    "args": [
+      "--host",
+      "gpt2"
+    ]
+  },
+  "budget": {
+    "max_calls": 3
+  },
+  "memory": {
+    "capacity": 1024
+  }
+}

@@ -1,0 +1,290 @@
+# VENOM-PARASITE — a plug-in layer that lets an LLM read its own forward pass
+
+**Status: research prototype. Alpha. The central scientific claim is NOT established.**
+
+This document is the honest write-up. It is deliberately written to be
+readable by a reviewer who wants to catch us out. Every number below was
+produced by a script in this repository; every claim that is not measured is
+marked as such.
+
+---
+
+## 1. The idea in one paragraph
+
+An LLM's forward pass produces hidden states and logits that are, today,
+invisible to the model itself. We expose them as **ordinary tools** over MCP,
+so the model can ask questions of its own computation: *how uncertain am I?
+which layer decided this? where do I hold this fact?* Every tool that could
+change the host is bounded, measured, and revertible, and the host model is
+never modified without a proof that the change can be undone.
+
+## 2. What is *not* being claimed
+
+This matters more than the claims.
+
+| We do NOT claim | Why |
+|---|---|
+| "The model becomes self-aware." | The best current evidence says the opposite. A supervised probe beats a model's own self-report **98.3% vs 11.1%** on perturbation localisation ([arXiv 2611.15267](https://arxiv.org/pdf/2611.15267v2)). |
+| "Reading activations gives introspection." | Models cannot reliably distinguish an *activation-level* intervention from an *input-level* one ([arXiv 2605.26242](https://arxiv.org/html/2605.26242v1)); detection is **content-agnostic** ([arXiv 2603.05414](https://arxiv.org/pdf/2603.05414)). |
+| "The layer makes the model smarter." | Untested. The one gate we ran shows the injection path is not actively harmful on a small fact set — nothing more. |
+| "The layer is faster." | The layer *adds* work. Measured overhead for the read-only bus is ≈ **+2%** on GPT-2 CPU, and that number is noise-dominated. |
+| "Self-edit improves the model." | We can bound, measure and revert a self-edit. Whether a bounded edit *helps* is unanswered. |
+| "This is new." | Forward hooks, activation steering, conditional steering, uncertainty-gated tool use and MCP are all prior art. See §7. |
+
+## 3. Architecture
+
+```
+user / MCP client
+      │
+      ▼
+venom/server.py          MCP JSON-RPC 2.0 over stdio — 15 tools
+      │
+      ▼
+venom/core/runtime.py    VenomRuntime: memory · budget · reflex · telemetry
+      │                    + optional host internals (probe, taps, norm, head, dials)
+      ├──────────────► venom/core/discovery.py   finds blocks/head/norm of ANY architecture
+      ├──────────────► venom/memory/store.py    exact recall, digest guard, abstain
+      ├──────────────► venom/reflex/             rule-based trigger, budget, injector
+      ├──────────────► venom/sensors/            uncertainty, consensus, attribution, audit
+      ├──────────────► venom/verify/             drift classification, rollback
+      ├──────────────► venom/surgeon/prune.py    gated self-surgery
+      └──────────────► venom/integrations/       20 sibling repos, called not copied
+```
+
+Two entry points cover every host we could think of:
+
+```python
+# open-weight, local
+from venom.shell import attach
+with attach(model, tokenizer) as host:
+    host.chat("what is the capital of france?")
+
+# any API model (GPT, Claude, Gemini, vLLM, Ollama)
+venom proxy --upstream https://api.openai.com/v1 --upstream-model gpt-4o-mini
+```
+
+## 4. The trust contract, and how it is enforced
+
+This is the load-bearing part of the project. Four properties, each with a
+test that fails if the property breaks.
+
+### 4.1 Attach → detach is bit-exact
+
+A forward hook that returns `None` leaves PyTorch's output untouched. That
+single fact is what makes the layer non-invasive.
+
+```bash
+python experiments/e2_universal_attach.py
+```
+
+| Model | Family | `bit_exact_during` | `bit_exact_after_detach` | logit hash |
+|---|---|---|---|---|
+| GPT-2 124M | gpt2 | ✅ | ✅ | identical |
+| Qwen2.5-0.5B-Instruct | qwen2 | ✅ | ✅ | identical |
+| SmolLM2-135M-Instruct | llama | ✅ | ✅ | identical |
+
+Also covered by `tests/test_bus_torch.py`: tuple-returning modules, repeated
+attach/detach cycles, and taps being snapshots rather than live aliases.
+
+### 4.2 The memory abstains; it never guesses
+
+Unknown → `abstain/not_found`. Corrupted → `abstain/digest_mismatch`. The
+digest survives the persistence boundary: a hand-edited memory file loads as
+abstain, not as a hit.
+
+### 4.3 Every intervention is bounded and revertible
+
+A **dial** scales one block's output by `(1 + delta)`. `max_delta` caps the
+magnitude, `max_active_dials` caps how many can be live, and a verifier
+measures the drift against a captured baseline. If the drift exceeds the
+threshold, the dial is rolled back automatically.
+
+```bash
+venom dial --model gpt2 --layer 3 --delta 0.05
+```
+
+| delta | measured drift | outcome |
+|---|---|---|
+| 0.01 | 0.00646 | applied, verified |
+| 0.02 | 0.01240 | applied, verified |
+| 0.03 | 0.01794 | applied, verified |
+| 0.05 | **0.02809** | **auto-rolled back** (> 0.02 threshold), host restored bit-exactly |
+
+A verifier that *cannot measure* is treated as a failure, not as "no drift".
+We got this wrong first: an early version reported `drift: 0.0` when it had
+measured nothing, which would have let an unverified edit through.
+
+### 4.4 Self-surgery is gated by a held-out proof
+
+`venom/surgeon/prune.py` implements the plan's P5 gate: *"drift = 0, warna
+prune radd"*. It plans, snapshots, applies, measures the drift on a
+**held-out** set, and restores the weights if the drift is out of bounds.
+The plan set and the held-out set are disjoint on purpose — verifying a
+prune on the same prompts that justified it proves nothing.
+
+On GPT-2 the gate **refused to prune**: every unit of every projection fired
+at least once over the plan prompts, so nothing was prunable and nothing
+changed. That is the correct outcome, and it is the honest one: ten prompts
+cannot establish that a unit is dead.
+
+## 5. The tool surface
+
+15 tools, Tier 1 (open-weight hosts, everything) and Tier 2 (API-only hosts,
+memory + verify + state). The API proxy serves **Tier 2 by default** — an API
+host has no access to its own internals, so offering it `venom.uncertainty`
+would be a lie.
+
+| Tool | What it does |
+|---|---|
+| `venom.recall` / `remember` / `forget` | exact memory, with retraction |
+| `venom.time_now` | the host has no clock |
+| `venom.uncertainty` | entropy / margin / confidence of the last token |
+| `venom.check_myself` | layer-wise agreement with the final top-1 |
+| `venom.why` / `where` | logit-lens trajectory and localisation |
+| `venom.verify` | verified / contradicted / unknown against memory |
+| `venom.dial` | bounded self-edit with auto-rollback |
+| `venom.prune` | gated self-surgery |
+| `venom.audit` | dead neurons, redundancy, compressibility — **report only** |
+| `venom.snapshot` / `restore` / `report` | state control |
+
+### What the self-read tools actually returned on GPT-2
+
+Prompt: *"The capital of France is"*.
+
+| Tool | Result |
+|---|---|
+| `venom.uncertainty` | entropy **5.998**, margin **0.037**, confidence **0.085**, `is_uncertain: true` |
+| `venom.check_myself` | **1 of 12** layers agree with the final top-1 → *"decided late"* |
+| `venom.where(" France")` | best represented at **layer 9** (rank 0) |
+| `venom.why(" Paris")` | target logit **−8.84** at layer 0, never overtakes → `decision_layer: null` — GPT-2 did not predict "Paris" at all |
+| `venom.audit` | **8 of 11** layer pairs near-duplicate (cosine > 0.99); 5 of 6 sampled layers compressible |
+
+Each payload carries its own caveat. `check_myself` states in the response
+that layer agreement is **not** introspection, and cites the papers above.
+
+## 6. The P0 gate, and the control that makes it mean something
+
+The plan's exit gate for P0: *"fix rate > harm rate"*.
+
+```bash
+python experiments/e5_fix_harm.py --model gpt2
+```
+
+| Arm | fix rate | harm rate | baseline acc | VENOM acc |
+|---|---|---|---|---|
+| VENOM memory | **0.417** | **0.375** | 0.40 | 0.45 |
+| neutral-memory control | 0.0 | 0.0 | 0.40 | 0.40 |
+
+The **control** is the point: the same bank of facts, stored under keys that
+match nothing, changed **zero** answers. Without it, "fix rate" could just
+be "any extra text helps".
+
+**The honest reading:** this is 20 facts on one 124M model, and the fix rate
+is largely the model *copying the injected context*. That is a property of
+the benchmark, not a demonstration of knowledge repair. The plan asks for 400
+facts; we have not run that.
+
+One methodological note for anyone repeating this: the gate compares
+**rates**, not counts. An early version compared counts and reported a pass
+where 10 fixed vs 9 harmed (0.43 vs 0.53 by rate) was in fact a loss.
+
+## 7. Related work, and the honest novelty statement
+
+The literature is crowded, and two published results land directly on this
+project's core mechanisms.
+
+**Prior art we build on:** activation steering (Turner et al. 2023; ActAdd),
+inference-time intervention (Li et al. 2024), **Conditional Activation
+Steering** (ICLR 2025 — the closest published cousin to the reflex layer),
+LayerNavigator (NeurIPS 2025), RADIANT (arXiv 2501.15758), SAFESTEER (EMNLP
+2025), uncertainty-gated tool use (UALA), Calib-Abstain's tiered thresholds,
+MCP as a transport, and self-referential agents (Gödel Agent).
+
+**Results that constrain us:**
+
+- **Memory-induced tool-drift** ([arXiv 2605.24941](https://arxiv.org/html/2605.24941v2)):
+  biased memories shift tool-call parameters across all 8 tested models
+  (degradation 0.38–0.83 vs 0.05–0.12 for neutral memories). *This is
+  exactly what our injector does*, which is why the injector refuses generic
+  keys and why the neutral-memory control is mandatory.
+- **Activation reading ≠ introspection** (see §2). This is why the self-read
+  tools are described as sensors, and why experiment E5 below is the most
+  important one we have not run.
+
+**The novelty statement we can defend:**
+
+> *New:* a host LLM invoking tools that read **its own** forward-pass
+> internals through a standard tool interface, where the whole stack is
+> governed by a **bit-exact detach contract**, a **budget**, and a
+> **held-out verification gate** before any self-modification is kept.
+
+> *Not new:* forward hooks, activation steering, conditional steering,
+> uncertainty-gated tool use, MCP, rollback-as-a-pattern.
+
+## 8. The experiments we still owe
+
+In priority order. Each has a kill criterion attached.
+
+| # | Experiment | Decides |
+|---|---|---|
+| **E5** | **Content-agnostic control**: compare detection of an *activation-layer* perturbation against an *input-level* one, on the same host | Whether the self-read tools are introspection or an anomaly detector. **This is the experiment the whole project rests on.** |
+| E2 | Fix/harm on 400 facts, and on a tool-calling host | The real P0 gate |
+| E3 | Reflex-path latency during a full generation | Whether the layer is affordable |
+| E4 | Held-out verifier strength for a self-edit dial | Whether self-edit is safe at all |
+| E6 | Drift over 10k prompts for pruning | The real P5 gate |
+
+**We predict E5 will show anomaly detection rather than introspection.** The
+literature says so. That prediction is stated now, before the result, so it
+cannot be quietly moved later.
+
+## 9. Reproducing everything
+
+```bash
+pip install -e ".[dev,torch]"
+pytest -q                                   # 179 tests
+python experiments/e1_bus_detach.py         # bit-exactness + latency
+python experiments/e1b_latency_isolated.py   # randomised A/B latency
+python experiments/e2_universal_attach.py    # 3 architectures, real weights
+python experiments/e2b_architecture_sweep.py # 30 architectures, meta-device
+python experiments/e3_selfread.py            # the self-read tools on a real model
+python experiments/e4_gated_prune.py         # gated self-surgery
+python experiments/e5_fix_harm.py           # the P0 gate + control
+```
+
+## 10. Limitations
+
+`LIMITATIONS.md` is the long form. The four that matter most:
+
+1. The self-read numbers are **self-reports about a computation**, not about
+   knowledge.
+2. `why`/`where` are **logit-lens readouts, not causal proofs**.
+3. `dial` measures **magnitude, not quality**.
+4. "Any AI" means **HF causal LMs with a standard block container** plus
+   **OpenAI-compatible APIs**; Anthropic-native and Gemini-native APIs need
+   their own adapters. The architecture sweep covered 22 of 30 models across
+   18 families — the 8 failures were all *access* failures (gated or renamed
+   repos), not discovery failures.
+
+## 11. Repository consolidation
+
+The master plan named 20 sibling repositories as the sources for this
+work. Rather than re-implementing them, `venom/integrations/` **calls** them
+— NEVER_LIE's fuzz routine, INNER-VOTE's consensus curve, TRACE-PATH's
+activation patching, DEAD-CELL's census, TMU's internal clock — behind
+optional adapters that degrade to `{"ok": False}` when a sibling is absent.
+The remaining 111 repositories are indexed in
+[`ARCHIVE.md`](ARCHIVE.md).
+
+## 12. Citation
+
+```bibtex
+@software{venom_parasite_2026,
+  title  = {VENOM-PARASITE: a plug-in layer that lets an LLM read its own forward pass},
+  author = {{Kapil}},
+  year   = {2026},
+  url    = {https://github.com/kapildhinwa2010-dev/VENOM},
+  note   = {Research prototype. The central scientific claim is not established.}
+}
+```
+
+MIT licensed.

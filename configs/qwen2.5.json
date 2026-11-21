@@ -1,15 +1,25 @@
 {
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
   "family": "qwen2",
-  "name_hint": "Qwen/Qwen2.5-1.5B-Instruct",
+  "model_type": "qwen2",
   "blocks_path": "model.layers",
-  "lm_head_path": "lm_head",
+  "num_layers": 24,
+  "lm_head_path": "get_output_embeddings()",
   "norm_path": "model.norm",
-  "tool_call_style": "openai",
+  "confidence": 1.0,
+  "note": "Generated from a real fingerprint (meta-device build) by scripts/gen_configs.py",
   "mcp": {
     "transport": "stdio",
     "command": "venom",
-    "args": ["--host", "qwen2.5"]
+    "args": [
+      "--host",
+      "qwen2.5"
+    ]
   },
-  "budget": { "max_calls": 3 },
-  "memory": { "capacity": 1024 }
+  "budget": {
+    "max_calls": 3
+  },
+  "memory": {
+    "capacity": 1024
+  }
 }

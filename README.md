@@ -336,6 +336,27 @@ python experiments/e5_fix_harm.py           # the P0 gate + neutral-memory contr
 
 ---
 
+## The write-up
+
+[`PAPER.md`](PAPER.md) is the honest research write-up: what is measured, what
+is *not* claimed, the prior art that constrains the project, the results that
+land directly on our mechanisms, and the experiments we still owe — including
+the one we predict will go against us.
+
+[`ARCHIVE.md`](ARCHIVE.md) indexes all 131 sibling repositories (20 consumed
+by VENOM, 111 archived). [`RESEARCH.md`](RESEARCH.md) is the full literature
+scan. [`LIMITATIONS.md`](LIMITATIONS.md) is the long-form honesty file.
+
+## Packaging
+
+```bash
+pip install venomlayer          # or: pip install -e ".[torch]"
+venom --help
+```
+
+`pyproject.toml` ships a `venom` console script, an optional `torch` extra
+and an optional `integrations` extra (the 20 sibling repos).
+
 ## License
 
 MIT — see [`LICENSE`](LICENSE).

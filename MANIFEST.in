@@ -1,0 +1,11 @@
+include README.md
+include LIMITATIONS.md
+include RESEARCH.md
+include ARCHIVE.md
+include PAPER.md
+include LICENSE
+recursive-include configs *.json
+recursive-include tests *.py
+recursive-include experiments *.py
+recursive-exclude * __pycache__
+recursive-exclude * *.py[cod]
