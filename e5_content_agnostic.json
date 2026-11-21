@@ -152,6 +152,11 @@
   },
   "interpretation": "GENERIC: the self-read signal moves about as much for an input-level perturbation as for an activation-level one. That is the signature of an ANOMALY DETECTOR, not introspection.",
   "signal_ratio_activation_over_input": 0.201,
-  "most_diverged_layer": 6,
+  "activation_first_diverged_layer": 6,
+  "activation_most_diverged_layer": 6,
+  "input_first_diverged_layer": 0,
+  "input_most_diverged_layer": 0,
+  "layers_bit_exact_before_injection": 6,
+  "localisation_correct": true,
   "caveat": "One model, one prompt, one perturbation direction. A ratio above 1.5 is not a proof of introspection and a ratio below it is not a proof of its absence. The published evidence (arXiv 2605.26242, 2603.05414, 2611.15267) favours the generic reading."
 }
