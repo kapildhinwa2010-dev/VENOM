@@ -1,0 +1,53 @@
+{
+  "gates": {
+    "recall": {
+      "n": 400,
+      "exact_hits": 400,
+      "exact_rate": 1.0,
+      "fuzzy_hits": 348,
+      "fuzzy_rate": 0.87,
+      "injections": 348,
+      "gate": "tool-path recall >= 60%",
+      "passes": true,
+      "seconds": 0.06
+    },
+    "abstain": {
+      "n": 400,
+      "corrupted": 400,
+      "abstained": 400,
+      "abstain_rate": 1.0,
+      "leaked_hits": 0,
+      "reasons": {
+        "digest_mismatch": 400
+      },
+      "file_abstain_rate": 1.0,
+      "gate": "abstain rate >= 95% under corruption",
+      "passes": true,
+      "seconds": 0.5
+    },
+    "latency": {
+      "model": "gpt2",
+      "trials": 21,
+      "median_base_ms": 1359.331,
+      "median_attached_ms": 1369.155,
+      "median_with_tool_ms": 1393.44,
+      "hook_overhead_pct": 0.723,
+      "tool_call_cost_pct": 1.774,
+      "reflex_eval_ms": 0.03397,
+      "reflex_eval_pct": 0.0025,
+      "layer_overhead_pct": 0.725,
+      "base_ms_iqr": [
+        1304.53,
+        1397.29
+      ],
+      "attached_ms_iqr": [
+        1313.01,
+        1396.87
+      ],
+      "gate": "layer overhead (hooks + reflex) <= 15%",
+      "passes": true,
+      "note": "the tool-call arm is reported SEPARATELY: a tool call runs its own forward pass, so its cost is the price of the tool, not the layer's overhead. Medians are used because a shared CPU makes the mean noisy",
+      "seconds": 142.66
+    }
+  }
+}

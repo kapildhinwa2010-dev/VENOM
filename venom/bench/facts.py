@@ -126,6 +126,28 @@ FACTS: List[Dict[str, str]] = [
 ]
 
 
+
+
+# ---------------------------------------------------------------------------
+# The generated half of the fact bank lives in `facts_data.py`. It grows the
+# bank past 400 facts so the plan's 400-fact gate can actually be run.
+# ---------------------------------------------------------------------------
+from venom.bench.facts_data import generated_facts as _generated_facts
+
+
+def _dedupe(items):
+    seen, out = set(), []
+    for item in items:
+        if item["key"] in seen:
+            continue
+        seen.add(item["key"])
+        out.append(item)
+    return out
+
+
+FACTS = _dedupe(list(FACTS) + _generated_facts())
+
+
 def facts() -> List[Dict[str, str]]:
     """A copy of the fact set."""
     return [dict(f) for f in FACTS]
@@ -138,6 +160,15 @@ def facts_for_model(model: str) -> List[Dict[str, str]]:
     anyway produces a benchmark where the baseline is ~0% and every number is
     noise. The tiers keep the baseline in a measurable range.
     """
-    if "124m" in model.lower() or "pythia-70m" in model.lower():
-        return [f for f in FACTS if f["key"].startswith("capital of")]
+    name = model.lower()
+    small = any(k in name for k in ("gpt2", "125m", "124m", "70m", "135m", "neo"))
+    if small:
+        # The tier a sub-200M model has a non-zero chance on. It has to be
+        # BIG - the plan's gate is 400 facts - but it also has to be the kind
+        # of fact a small model might actually know, otherwise the baseline
+        # is 0% and every rate is noise.
+        tier = ("capital of", "currency of", "language of",
+                "chemical symbol for", "atomic number of",
+                "birth year of", "author of")
+        return [f for f in FACTS if f["key"].startswith(tier)]
     return [dict(f) for f in FACTS]
