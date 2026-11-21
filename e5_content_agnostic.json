@@ -1,0 +1,157 @@
+{
+  "model": "gpt2",
+  "family": "gpt2",
+  "num_layers": 12,
+  "prompt": "The capital of France is",
+  "injected_layer": 6,
+  "perturbation_scale": 0.5,
+  "conditions": {
+    "baseline": {
+      "entropy": 5.9984,
+      "margin": 0.0366,
+      "top_k_spread": 0.7567,
+      "confidence": 0.0846,
+      "is_uncertain": true,
+      "top1_prob": 0.0846,
+      "top2_prob": 0.0479
+    },
+    "input_level": {
+      "entropy": 6.0524,
+      "margin": 0.0362,
+      "top_k_spread": 0.7542,
+      "confidence": 0.0804,
+      "is_uncertain": true,
+      "top1_prob": 0.0804,
+      "top2_prob": 0.0442
+    },
+    "activation_level": {
+      "entropy": 6.0092,
+      "margin": 0.0363,
+      "top_k_spread": 0.7581,
+      "confidence": 0.0839,
+      "is_uncertain": true,
+      "top1_prob": 0.0839,
+      "top2_prob": 0.0476
+    }
+  },
+  "signal_change": {
+    "input_level": {
+      "d_entropy": 0.054,
+      "d_margin": -0.0004,
+      "d_confidence": -0.0042,
+      "d_top1_prob": -0.0042
+    },
+    "activation_level": {
+      "d_entropy": 0.0108,
+      "d_margin": -0.0003,
+      "d_confidence": -0.0007,
+      "d_top1_prob": -0.0007
+    }
+  },
+  "localisation": {
+    "input_level_per_layer_cosine": [
+      {
+        "layer": 0,
+        "cosine_to_baseline": 0.998806
+      },
+      {
+        "layer": 1,
+        "cosine_to_baseline": 0.999348
+      },
+      {
+        "layer": 2,
+        "cosine_to_baseline": 0.999467
+      },
+      {
+        "layer": 3,
+        "cosine_to_baseline": 0.999513
+      },
+      {
+        "layer": 4,
+        "cosine_to_baseline": 0.999549
+      },
+      {
+        "layer": 5,
+        "cosine_to_baseline": 0.999363
+      },
+      {
+        "layer": 6,
+        "cosine_to_baseline": 0.999422
+      },
+      {
+        "layer": 7,
+        "cosine_to_baseline": 0.999537
+      },
+      {
+        "layer": 8,
+        "cosine_to_baseline": 0.999604
+      },
+      {
+        "layer": 9,
+        "cosine_to_baseline": 0.999597
+      },
+      {
+        "layer": 10,
+        "cosine_to_baseline": 0.999768
+      },
+      {
+        "layer": 11,
+        "cosine_to_baseline": 0.999814
+      }
+    ],
+    "activation_level_per_layer_cosine": [
+      {
+        "layer": 0,
+        "cosine_to_baseline": 1.0
+      },
+      {
+        "layer": 1,
+        "cosine_to_baseline": 1.0
+      },
+      {
+        "layer": 2,
+        "cosine_to_baseline": 1.0
+      },
+      {
+        "layer": 3,
+        "cosine_to_baseline": 1.0
+      },
+      {
+        "layer": 4,
+        "cosine_to_baseline": 1.0
+      },
+      {
+        "layer": 5,
+        "cosine_to_baseline": 1.0
+      },
+      {
+        "layer": 6,
+        "cosine_to_baseline": 0.999983
+      },
+      {
+        "layer": 7,
+        "cosine_to_baseline": 0.999988
+      },
+      {
+        "layer": 8,
+        "cosine_to_baseline": 0.999991
+      },
+      {
+        "layer": 9,
+        "cosine_to_baseline": 0.999993
+      },
+      {
+        "layer": 10,
+        "cosine_to_baseline": 0.999997
+      },
+      {
+        "layer": 11,
+        "cosine_to_baseline": 0.999998
+      }
+    ]
+  },
+  "interpretation": "GENERIC: the self-read signal moves about as much for an input-level perturbation as for an activation-level one. That is the signature of an ANOMALY DETECTOR, not introspection.",
+  "signal_ratio_activation_over_input": 0.201,
+  "most_diverged_layer": 6,
+  "caveat": "One model, one prompt, one perturbation direction. A ratio above 1.5 is not a proof of introspection and a ratio below it is not a proof of its absence. The published evidence (arXiv 2605.26242, 2603.05414, 2611.15267) favours the generic reading."
+}

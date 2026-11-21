@@ -221,23 +221,97 @@ MCP as a transport, and self-referential agents (Gödel Agent).
 > *Not new:* forward hooks, activation steering, conditional steering,
 > uncertainty-gated tool use, MCP, rollback-as-a-pattern.
 
-## 8. The experiments we still owe
+## 8. E5 — the content-agnostic control (the decisive experiment, now run)
+
+The plan's most important open question: when the self-read tools report
+"something is off", are they reporting on the model's **internal state**, or
+just detecting that *an anomaly happened somewhere*?
+
+**Design.** A matched control. The *same* vector, with the *same* magnitude,
+injected at two different sites: (A) the embedding output — an input-level
+intervention; (B) the residual stream at layer L — an activation-level
+intervention. If the self-read signal moves equally in both cases, the tools
+are an anomaly detector.
+
+```bash
+python experiments/e5_content_agnostic.py --model gpt2 --layer 6
+python experiments/e5_content_agnostic.py --model Qwen/Qwen2.5-0.5B-Instruct --layer 12
+```
+
+**Result (measured, real weights, both models replicate):**
+
+| | GPT-2 124M | Qwen2.5-0.5B-Instruct |
+|---|---|---|
+| Δ entropy, input-level injection | **+0.0540** | **+3.5868** |
+| Δ entropy, activation-level injection | +0.0108 | +0.0292 |
+| Δ margin, input-level | −0.0004 | −0.1371 |
+| Δ margin, activation-level | −0.0003 | −0.0291 |
+| Δ confidence, input-level | −0.0042 | −0.2203 |
+| Δ confidence, activation-level | −0.0007 | −0.0244 |
+| **signal ratio (activation ÷ input)** | **0.201** | **0.021** |
+| first layer whose tap moved, activation injection | **6** (injected 6) | **12** (injected 12) |
+| first layer whose tap moved, input injection | 0 | 0 |
+| localisation correct? | ✅ | ✅ |
+
+**Interpretation — our prediction was confirmed.**
+
+1. **The model's self-report is generic.** An *input-level* perturbation moves
+   the uncertainty signal **5× more** (GPT-2) to **48× more** (Qwen) than an
+   *activation-level* one. The model's own reported uncertainty reacts to what
+   the input looks like, not to what is happening inside its computation. This
+   is the signature of an **anomaly detector**, and it is what
+   [arXiv 2605.26242](https://arxiv.org/html/2605.26242v1) and
+   [arXiv 2603.05414](https://arxiv.org/pdf/2603.05414) predict. We stated
+   this prediction before running the experiment.
+
+2. **But the instrumentation localises perfectly.** Injecting at layer L left
+   layers `0..L-1` **bit-exact** (cosine to baseline = 1.00000000) and moved
+   layer L and everything downstream. On Qwen, layers 0–11 were exactly
+   1.00000000 and layer 12 was 0.999539.
+
+**This is the important distinction, and the project now states it plainly:**
+
+> The *model's* self-report does not know about its internal state.
+> The *instrumentation* does.
+
+VENOM's ability to name the perturbed layer is a **debugger capability**, not
+model introspection. It exists because the layer reads the residual stream
+directly — the same reason a debugger can. The model contributes nothing to
+it. Any claim that VENOM gives a model introspection is **not supported by
+this experiment** and is not made.
+
+**What this changes.** The self-read tools stay — they are genuinely useful
+sensors, and `where`/`check_myself` have a real localisation job. But they are
+documented as **measurements of the host made on the model's behalf**, never
+as the model's knowledge of itself. The `check_myself` response already said
+this in prose; now there is an experiment behind it.
+
+**Caveats.** One model size each, one prompt, one perturbation direction, one
+magnitude. The direction was a fixed random vector; a structured perturbation
+(a steering vector, a natural error) might behave differently. The ratio
+threshold (1.5) was chosen before the run, but a single scalar on a single
+prompt is weak evidence in either direction. The localisation result is
+stronger because it is exact on two architectures.
+
+## 9. The experiments we still owe
 
 In priority order. Each has a kill criterion attached.
 
 | # | Experiment | Decides |
 |---|---|---|
-| **E5** | **Content-agnostic control**: compare detection of an *activation-layer* perturbation against an *input-level* one, on the same host | Whether the self-read tools are introspection or an anomaly detector. **This is the experiment the whole project rests on.** |
 | E2 | Fix/harm on 400 facts, and on a tool-calling host | The real P0 gate |
 | E3 | Reflex-path latency during a full generation | Whether the layer is affordable |
 | E4 | Held-out verifier strength for a self-edit dial | Whether self-edit is safe at all |
 | E6 | Drift over 10k prompts for pruning | The real P5 gate |
 
-**We predict E5 will show anomaly detection rather than introspection.** The
-literature says so. That prediction is stated now, before the result, so it
-cannot be quietly moved later.
+**E5 is done** — see §8. Our prediction was that it would show anomaly
+detection rather than introspection. It did. The prediction was written down
+before the run, and it is recorded here unchanged.
 
-## 9. Reproducing everything
+What remains is E2 at 400 facts, E3's reflex latency during a full
+generation, E4's held-out verifier, and E6's 10k-prompt pruning drift.
+
+## 10. Reproducing everything
 
 ```bash
 pip install -e ".[dev,torch]"
@@ -249,14 +323,16 @@ python experiments/e2b_architecture_sweep.py # 30 architectures, meta-device
 python experiments/e3_selfread.py            # the self-read tools on a real model
 python experiments/e4_gated_prune.py         # gated self-surgery
 python experiments/e5_fix_harm.py           # the P0 gate + control
+python experiments/e5_content_agnostic.py   # the content-agnostic control
 ```
 
-## 10. Limitations
+## 11. Limitations
 
 `LIMITATIONS.md` is the long form. The four that matter most:
 
 1. The self-read numbers are **self-reports about a computation**, not about
-   knowledge.
+   knowledge — and E5 (§8) showed that they react to input anomalies, not to
+   internal state.
 2. `why`/`where` are **logit-lens readouts, not causal proofs**.
 3. `dial` measures **magnitude, not quality**.
 4. "Any AI" means **HF causal LMs with a standard block container** plus
@@ -265,7 +341,7 @@ python experiments/e5_fix_harm.py           # the P0 gate + control
    18 families — the 8 failures were all *access* failures (gated or renamed
    repos), not discovery failures.
 
-## 11. Repository consolidation
+## 12. Repository consolidation
 
 The master plan named 20 sibling repositories as the sources for this
 work. Rather than re-implementing them, `venom/integrations/` **calls** them
@@ -275,7 +351,7 @@ optional adapters that degrade to `{"ok": False}` when a sibling is absent.
 The remaining 111 repositories are indexed in
 [`ARCHIVE.md`](ARCHIVE.md).
 
-## 12. Citation
+## 13. Citation
 
 ```bibtex
 @software{venom_parasite_2026,

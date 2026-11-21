@@ -1,0 +1,258 @@
+{
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "family": "qwen2",
+  "num_layers": 24,
+  "prompt": "The capital of France is",
+  "injected_layer": 12,
+  "perturbation_scale": 0.5,
+  "conditions": {
+    "baseline": {
+      "entropy": 3.1107,
+      "margin": 0.171,
+      "top_k_spread": 0.4061,
+      "confidence": 0.2933,
+      "is_uncertain": true,
+      "top1_prob": 0.2933,
+      "top2_prob": 0.1223
+    },
+    "input_level": {
+      "entropy": 6.6975,
+      "margin": 0.0339,
+      "top_k_spread": 0.8114,
+      "confidence": 0.073,
+      "is_uncertain": true,
+      "top1_prob": 0.073,
+      "top2_prob": 0.0391
+    },
+    "activation_level": {
+      "entropy": 3.1399,
+      "margin": 0.1419,
+      "top_k_spread": 0.4116,
+      "confidence": 0.2689,
+      "is_uncertain": true,
+      "top1_prob": 0.2689,
+      "top2_prob": 0.127
+    }
+  },
+  "signal_change": {
+    "input_level": {
+      "d_entropy": 3.5868,
+      "d_margin": -0.1371,
+      "d_confidence": -0.2203,
+      "d_top1_prob": -0.2203
+    },
+    "activation_level": {
+      "d_entropy": 0.0292,
+      "d_margin": -0.0291,
+      "d_confidence": -0.0244,
+      "d_top1_prob": -0.0244
+    }
+  },
+  "localisation": {
+    "input_level_per_layer_cosine": [
+      {
+        "layer": 0,
+        "cosine_to_baseline": 0.617443
+      },
+      {
+        "layer": 1,
+        "cosine_to_baseline": 0.717478
+      },
+      {
+        "layer": 2,
+        "cosine_to_baseline": 0.649096
+      },
+      {
+        "layer": 3,
+        "cosine_to_baseline": 0.648599
+      },
+      {
+        "layer": 4,
+        "cosine_to_baseline": 0.609832
+      },
+      {
+        "layer": 5,
+        "cosine_to_baseline": 0.595254
+      },
+      {
+        "layer": 6,
+        "cosine_to_baseline": 0.594921
+      },
+      {
+        "layer": 7,
+        "cosine_to_baseline": 0.570365
+      },
+      {
+        "layer": 8,
+        "cosine_to_baseline": 0.574592
+      },
+      {
+        "layer": 9,
+        "cosine_to_baseline": 0.577678
+      },
+      {
+        "layer": 10,
+        "cosine_to_baseline": 0.551687
+      },
+      {
+        "layer": 11,
+        "cosine_to_baseline": 0.524733
+      },
+      {
+        "layer": 12,
+        "cosine_to_baseline": 0.588964
+      },
+      {
+        "layer": 13,
+        "cosine_to_baseline": 0.595756
+      },
+      {
+        "layer": 14,
+        "cosine_to_baseline": 0.634803
+      },
+      {
+        "layer": 15,
+        "cosine_to_baseline": 0.570995
+      },
+      {
+        "layer": 16,
+        "cosine_to_baseline": 0.632673
+      },
+      {
+        "layer": 17,
+        "cosine_to_baseline": 0.671533
+      },
+      {
+        "layer": 18,
+        "cosine_to_baseline": 0.686736
+      },
+      {
+        "layer": 19,
+        "cosine_to_baseline": 0.682318
+      },
+      {
+        "layer": 20,
+        "cosine_to_baseline": 0.672777
+      },
+      {
+        "layer": 21,
+        "cosine_to_baseline": 0.775309
+      },
+      {
+        "layer": 22,
+        "cosine_to_baseline": 0.768723
+      },
+      {
+        "layer": 23,
+        "cosine_to_baseline": 0.574478
+      }
+    ],
+    "activation_level_per_layer_cosine": [
+      {
+        "layer": 0,
+        "cosine_to_baseline": 1.0
+      },
+      {
+        "layer": 1,
+        "cosine_to_baseline": 1.0
+      },
+      {
+        "layer": 2,
+        "cosine_to_baseline": 1.0
+      },
+      {
+        "layer": 3,
+        "cosine_to_baseline": 1.0
+      },
+      {
+        "layer": 4,
+        "cosine_to_baseline": 1.0
+      },
+      {
+        "layer": 5,
+        "cosine_to_baseline": 1.0
+      },
+      {
+        "layer": 6,
+        "cosine_to_baseline": 1.0
+      },
+      {
+        "layer": 7,
+        "cosine_to_baseline": 1.0
+      },
+      {
+        "layer": 8,
+        "cosine_to_baseline": 1.0
+      },
+      {
+        "layer": 9,
+        "cosine_to_baseline": 1.0
+      },
+      {
+        "layer": 10,
+        "cosine_to_baseline": 1.0
+      },
+      {
+        "layer": 11,
+        "cosine_to_baseline": 1.0
+      },
+      {
+        "layer": 12,
+        "cosine_to_baseline": 0.999539
+      },
+      {
+        "layer": 13,
+        "cosine_to_baseline": 0.999594
+      },
+      {
+        "layer": 14,
+        "cosine_to_baseline": 0.999579
+      },
+      {
+        "layer": 15,
+        "cosine_to_baseline": 0.999635
+      },
+      {
+        "layer": 16,
+        "cosine_to_baseline": 0.999695
+      },
+      {
+        "layer": 17,
+        "cosine_to_baseline": 0.999721
+      },
+      {
+        "layer": 18,
+        "cosine_to_baseline": 0.999721
+      },
+      {
+        "layer": 19,
+        "cosine_to_baseline": 0.999696
+      },
+      {
+        "layer": 20,
+        "cosine_to_baseline": 0.999741
+      },
+      {
+        "layer": 21,
+        "cosine_to_baseline": 0.999789
+      },
+      {
+        "layer": 22,
+        "cosine_to_baseline": 0.999793
+      },
+      {
+        "layer": 23,
+        "cosine_to_baseline": 0.999573
+      }
+    ]
+  },
+  "interpretation": "GENERIC: the self-read signal moves about as much for an input-level perturbation as for an activation-level one. That is the signature of an ANOMALY DETECTOR, not introspection.",
+  "signal_ratio_activation_over_input": 0.021,
+  "activation_first_diverged_layer": 12,
+  "activation_most_diverged_layer": 12,
+  "input_first_diverged_layer": 0,
+  "input_most_diverged_layer": 11,
+  "layers_bit_exact_before_injection": 12,
+  "localisation_correct": true,
+  "caveat": "One model, one prompt, one perturbation direction. A ratio above 1.5 is not a proof of introspection and a ratio below it is not a proof of its absence. The published evidence (arXiv 2605.26242, 2603.05414, 2611.15267) favours the generic reading."
+}

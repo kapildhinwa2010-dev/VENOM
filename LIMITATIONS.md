@@ -248,3 +248,33 @@ Then add, in this order (`RESEARCH.md` §5):
 5. **E6** — a held-out verifier the intervention cannot edit.
 
 The numbers from those runs — and only those — may appear in a README.
+
+
+## E5 result: the self-read tools are an anomaly detector, not introspection
+
+Measured on real weights (GPT-2 124M layer 6, Qwen2.5-0.5B-Instruct layer 12),
+same vector, same magnitude, injected at two sites:
+
+| | GPT-2 | Qwen2.5 |
+|---|---|---|
+| Δentropy, input-level injection | +0.0540 | +3.5868 |
+| Δentropy, activation-level injection | +0.0108 | +0.0292 |
+| signal ratio (activation ÷ input) | 0.201 | 0.021 |
+| first tap layer moved, activation injection | 6 ✅ | 12 ✅ |
+| first tap layer moved, input injection | 0 | 0 |
+
+1. The model's self-reported uncertainty moved **more** for an input-level
+   perturbation than for an activation-level one, on both models. The
+   self-report tracks the input, not the internal computation.
+   **Consequence: no introspection claim is made anywhere in this project.**
+2. The tap stream localised the activation-level perturbation **exactly** -
+   layers 0..L-1 bit-exact (cosine 1.00000000), layer L and downstream moved.
+   This is a **debugger capability of the instrumentation**, contributed by
+   nothing the model knows.
+
+Caveats: one model size per family, one prompt, one random direction, one
+magnitude. Not tested with steering vectors, natural errors, or multiple
+prompts. The 1.5 ratio threshold was fixed before the run, but a single
+scalar on a single prompt is weak evidence either way. The localisation
+result is the stronger of the two because it is exact on two architectures.
+
