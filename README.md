@@ -374,6 +374,67 @@ compute, not intelligence.
 | Restore after the shape rewrite | **bit-exact** - drift back to **0.0** |
 | Install | manifest written, **49** writable modules, **no weight changed**, reload through the manifest gives a working write surface |
 
+## The automated pipeline (v0.6.0)
+
+One call runs every feature, feeds the answers into **one ordered ladder**,
+and applies what the ladder decides. Nobody hand-picks neurons.
+
+```bash
+venom auto --model gpt2 \
+  --prompts "calib one||calib two" \
+  --heldout "held one||held two" \
+  --mode remove --dry-run
+```
+
+The ladder is a MATLAB-shaped chain — **the first matching rule wins**:
+
+```
+1. if the unit fired on exactly zero calibration samples  -> REMOVE
+2. elif it fired on < 0.1% of samples                    -> ZERO
+3. elif its layer is a near-duplicate of another layer    -> FLAG_LAYER
+4. elif its layer is compressible and flat-tailed        -> FLAG_COMPRESS
+5. else                                                  -> KEEP
+```
+
+Only `REMOVE` and `ZERO` touch weights, and both go through the usual gate:
+apply → measure the drift on a **disjoint held-out set** → roll back if it is
+over the threshold. `FLAG_LAYER` and `FLAG_COMPRESS` are report-only.
+
+Every stage is **native** — no sibling repo needed:
+
+| Stage | Native implementation | What it asks |
+|---|---|---|
+| census | `venom/surgeon/census.py` | which units fired on how many prompts |
+| redundancy | `venom/sensors/audit.py` | which consecutive layers look alike |
+| compressibility | `venom/sensors/audit.py` | which layers have a low effective rank |
+| twin towers | `venom/surgeon/pipeline.py` | which layers are near-duplicates (cross-layer) |
+| skip-run | `venom/surgeon/pipeline.py` | does skipping the block change the output? |
+| power-law | `venom/surgeon/pipeline.py` | is the spectrum structured or flat? |
+
+### Measured on two small models
+
+| | GPT-2 124M | SmolLM2-135M-Instruct |
+|---|---|---|
+| FFN units scanned | 36 864 | 92 160 |
+| exactly-dead units | **0** | **0** |
+| rarely-active units | **0** | **0** |
+| near-duplicate layer pairs | 8 | 22 |
+| twin-tower clusters | 1 (max cos **0.9999**) | 2 (max cos **0.99999**) |
+| compressible layers | 5 of 6 | 5 of 6 |
+| skip-run on layer 0 | Δ **83.56**, **not** skippable | Δ **37.81**, **not** skippable |
+| ladder: REMOVE / ZERO | **0 / 0** | **0 / 0** |
+| ladder: FLAG_LAYER / FLAG_COMPRESS | 24 576 / 6 144 | 67 584 / 6 144 |
+| ladder: KEEP | 6 144 | 18 432 |
+| weights changed | **none** | **none** |
+
+**The interesting part is a contradiction the pipeline surfaces.** Redundancy
+says 8 near-duplicate layer pairs (cosine > 0.99), but the skip-run test says
+skipping a block changes the output by **83.56** in the logits — the layer is
+doing real work. A pipeline that trusted redundancy alone would have flagged
+8 layers as removable. That is the trap the plan's "redundant layers" feature
+would have walked into, and it is why the ladder treats redundancy as
+`FLAG_LAYER` (report-only) rather than as a licence to cut.
+
 ## The write-up
 
 [`PAPER.md`](PAPER.md) is the honest research write-up: what is measured, what

@@ -339,6 +339,26 @@ have produced a silently broken model:
   reshape the output. Shrinking the weight without updating them breaks the
   forward pass.
 
+## 8c. The automated pipeline (v0.6.0)
+
+The plan assumed somebody would sit with the feature outputs and decide what
+to cut. For a 100M-class model nobody will, so the layer does it: every
+feature runs, the answers feed **one ordered ladder** (a MATLAB-shaped
+`if / elseif` chain where the first match wins), and the ladder's verdicts are
+applied through the usual held-out drift gate.
+
+Measured on GPT-2 124M and SmolLM2-135M-Instruct: **0** exactly-dead units
+and **0** rarely-active units on both, so the ladder changed **no weights** on
+either - the correct outcome for healthy models.
+
+The finding worth keeping is a **contradiction between two features**:
+redundancy reports 8 near-duplicate layer pairs on GPT-2 (cosine > 0.99),
+while the skip-run test measures a logit delta of **83.56** when the same
+block is skipped. Consecutive layers of a residual network look alike because
+the residual stream dominates, not because they are redundant. A pipeline
+that trusted redundancy alone would have cut 8 live layers. Redundancy is
+therefore `FLAG_LAYER` - report-only - and never a licence to remove.
+
 ## 9. The experiments we still owe
 
 In priority order. Each has a kill criterion attached.
@@ -371,6 +391,7 @@ python experiments/e4_gated_prune.py         # gated self-surgery
 python experiments/e5_fix_harm.py           # the P0 gate + control
 python experiments/e5_content_agnostic.py   # the content-agnostic control
 python experiments/e6_kill_dead.py           # the surgery stack on a real model
+python experiments/e7_auto_surgery.py       # the automated ladder on a small model
 ```
 
 ## 11. Limitations

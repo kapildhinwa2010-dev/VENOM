@@ -1,0 +1,239 @@
+{
+  "ok": true,
+  "label": "gpt2",
+  "mode": "zero",
+  "census": {
+    "samples": 12,
+    "modules_scanned": 12,
+    "total_units": 36864,
+    "never_fired_units": 0,
+    "never_fired_fraction": 0.0,
+    "modules_with_dead": []
+  },
+  "redundancy": {
+    "pairs_compared": 11,
+    "near_duplicate": 8,
+    "similar": 0,
+    "candidates": [
+      {
+        "i": 2,
+        "j": 3,
+        "cosine_sim": 0.999828
+      },
+      {
+        "i": 3,
+        "j": 4,
+        "cosine_sim": 0.999865
+      },
+      {
+        "i": 4,
+        "j": 5,
+        "cosine_sim": 0.999808
+      },
+      {
+        "i": 5,
+        "j": 6,
+        "cosine_sim": 0.999675
+      },
+      {
+        "i": 6,
+        "j": 7,
+        "cosine_sim": 0.999567
+      },
+      {
+        "i": 7,
+        "j": 8,
+        "cosine_sim": 0.999465
+      },
+      {
+        "i": 8,
+        "j": 9,
+        "cosine_sim": 0.999346
+      },
+      {
+        "i": 9,
+        "j": 10,
+        "cosine_sim": 0.992413
+      }
+    ],
+    "warning": "Report only. No layers were merged."
+  },
+  "compressibility": {
+    "analyzed": 6,
+    "compressible": 5,
+    "details": {
+      "block_6": {
+        "eff_rank": 1,
+        "full_rank": 5,
+        "ratio": 0.2,
+        "compressible": true
+      },
+      "block_7": {
+        "eff_rank": 1,
+        "full_rank": 5,
+        "ratio": 0.2,
+        "compressible": true
+      },
+      "block_8": {
+        "eff_rank": 1,
+        "full_rank": 5,
+        "ratio": 0.2,
+        "compressible": true
+      },
+      "block_9": {
+        "eff_rank": 1,
+        "full_rank": 5,
+        "ratio": 0.2,
+        "compressible": true
+      },
+      "block_10": {
+        "eff_rank": 2,
+        "full_rank": 5,
+        "ratio": 0.4,
+        "compressible": true
+      },
+      "block_11": {
+        "eff_rank": 5,
+        "full_rank": 5,
+        "ratio": 1.0,
+        "compressible": false
+      }
+    },
+    "warning": "Analysis only. Nothing was compressed."
+  },
+  "twin_tower": {
+    "threshold": 0.99,
+    "layers_compared": 66,
+    "clusters": [
+      [
+        "block_10",
+        "block_2",
+        "block_3",
+        "block_4",
+        "block_5",
+        "block_6",
+        "block_7",
+        "block_8",
+        "block_9"
+      ]
+    ],
+    "max_pair_similarity": 0.999865,
+    "note": "a near-duplicate layer pair is a candidate for skipping, not for deleting"
+  },
+  "powerlaw": {
+    "layers_analyzed": 12,
+    "details": [
+      {
+        "layer": 0,
+        "activation_exponent": null
+      },
+      {
+        "layer": 1,
+        "activation_exponent": null
+      },
+      {
+        "layer": 2,
+        "activation_exponent": null
+      },
+      {
+        "layer": 3,
+        "activation_exponent": null
+      },
+      {
+        "layer": 4,
+        "activation_exponent": null
+      },
+      {
+        "layer": 5,
+        "activation_exponent": null
+      },
+      {
+        "layer": 6,
+        "activation_exponent": null
+      },
+      {
+        "layer": 7,
+        "activation_exponent": null
+      },
+      {
+        "layer": 8,
+        "activation_exponent": null
+      },
+      {
+        "layer": 9,
+        "activation_exponent": null
+      },
+      {
+        "layer": 10,
+        "activation_exponent": null
+      },
+      {
+        "layer": 11,
+        "activation_exponent": null
+      }
+    ],
+    "note": "a negative exponent_gap means the ACTIVATIONS are flatter than the WEIGHTS - the layer is closer to noise than to structured content"
+  },
+  "skip_run": {
+    "ok": true,
+    "max_abs_logit_delta": 83.56128693,
+    "mean_abs_logit_delta": 52.1021867601,
+    "top1_agreement": 0.0,
+    "samples": 5,
+    "layer": 0,
+    "skippable": false
+  },
+  "contradiction": {
+    "note": "consecutive layers have a high output cosine, but skipping one changes the model's output - the residual stream carries the information, so a high cosine does NOT mean the layer is redundant",
+    "near_duplicate_pairs": 8,
+    "skip_run_max_delta": 83.56128693,
+    "skippable": false
+  },
+  "ladder": {
+    "rules": [
+      {
+        "order": 1,
+        "name": "exactly_dead",
+        "description": "the unit fired on zero calibration samples",
+        "action": "REMOVE"
+      },
+      {
+        "order": 2,
+        "name": "nearly_dead",
+        "description": "the unit fired on fewer than rare_threshold of samples",
+        "action": "ZERO"
+      },
+      {
+        "order": 3,
+        "name": "twin_layer",
+        "description": "the unit's layer is a near-duplicate of another layer",
+        "action": "FLAG_LAYER"
+      },
+      {
+        "order": 4,
+        "name": "compressible_flat",
+        "description": "the layer is compressible and its spectrum is flat-tailed",
+        "action": "FLAG_COMPRESS"
+      },
+      {
+        "order": 5,
+        "name": "default",
+        "description": "no rule matched",
+        "action": "KEEP"
+      }
+    ],
+    "tally": {
+      "KEEP": 6144,
+      "FLAG_LAYER": 24576,
+      "FLAG_COMPRESS": 6144
+    },
+    "text": "LADDER (first matching rule wins):\n\n  1. if the unit fired on zero calibration samples\n       -> REMOVE   [0 units]\n  2. if the unit fired on fewer than rare_threshold of samples\n       -> ZERO   [0 units]\n  3. if the unit's layer is a near-duplicate of another layer\n       -> FLAG_LAYER   [24576 units]\n  4. if the layer is compressible and its spectrum is flat-tailed\n       -> FLAG_COMPRESS   [6144 units]\n  5. if no rule matched\n       -> KEEP   [6144 units]\n  else -> KEEP   [6144 units]"
+  },
+  "verdicts": [],
+  "applied": {
+    "ok": true,
+    "note": "the ladder selected nothing to change - this is the usual result on a healthy model",
+    "removed_modules": {},
+    "zeroed_modules": {}
+  }
+}

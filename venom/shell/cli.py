@@ -382,6 +382,29 @@ def cmd_write(args) -> int:
     return 0 if out.get("ok") else 1
 
 
+def cmd_auto(args) -> int:
+    """Run the automated surgery pipeline: every feature, then the ladder."""
+    from venom.surgeon.pipeline import auto_surgery
+
+    model, tok = _load_model(args.model, args.dtype)
+    plan, held = _prompts(args), _prompts_heldout(args)
+    if not plan or not held:
+        print("a calibration set and a DISJOINT held-out set are both required",
+              file=sys.stderr)
+        return 2
+    out = auto_surgery(model, tok, plan_prompts=plan, heldout_prompts=held,
+                       mode=args.mode, drift_threshold=args.drift_threshold,
+                       apply=not args.dry_run, label=args.model)
+    print(out.get("ladder", {}).get("text", ""))
+    print(json.dumps({"census": out.get("census"),
+                      "redundancy": out.get("redundancy"),
+                      "twin_tower": out.get("twin_tower"),
+                      "skip_run": out.get("skip_run"),
+                      "contradiction": out.get("contradiction"),
+                      "applied": out.get("applied")}, indent=2, default=str))
+    return 0 if out.get("ok") else 1
+
+
 # ------------------------------------------------------------------- parser
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="venom", description=__doc__.split("\n")[0])
@@ -489,6 +512,18 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--target", default=None)
     s.add_argument("--units", default="", help="comma separated unit indices")
     s.set_defaults(func=cmd_write)
+
+    s = sub.add_parser("auto", help="automated surgery: all features + the decision ladder")
+    s.add_argument("--model", required=True)
+    s.add_argument("--dtype", default="auto")
+    s.add_argument("--prompts", default="", help="CALIBRATION set, separated by ||")
+    s.add_argument("--prompts-file", default=None)
+    s.add_argument("--heldout", default="", help="HELD-OUT set, disjoint from above")
+    s.add_argument("--heldout-file", default=None)
+    s.add_argument("--mode", default="zero", choices=["zero", "remove"])
+    s.add_argument("--drift-threshold", type=float, default=0.0)
+    s.add_argument("--dry-run", action="store_true")
+    s.set_defaults(func=cmd_auto)
 
     s = sub.add_parser("dial", help="apply a bounded self-edit and measure the drift")
     s.add_argument("--model", required=True)

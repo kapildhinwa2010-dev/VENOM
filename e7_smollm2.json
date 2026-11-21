@@ -1,0 +1,388 @@
+{
+  "ok": true,
+  "label": "HuggingFaceTB/SmolLM2-135M-Instruct",
+  "mode": "zero",
+  "census": {
+    "samples": 12,
+    "modules_scanned": 60,
+    "total_units": 92160,
+    "never_fired_units": 0,
+    "never_fired_fraction": 0.0,
+    "modules_with_dead": []
+  },
+  "redundancy": {
+    "pairs_compared": 29,
+    "near_duplicate": 22,
+    "similar": 2,
+    "candidates": [
+      {
+        "i": 2,
+        "j": 3,
+        "cosine_sim": 0.998829
+      },
+      {
+        "i": 3,
+        "j": 4,
+        "cosine_sim": 0.998938
+      },
+      {
+        "i": 4,
+        "j": 5,
+        "cosine_sim": 0.998846
+      },
+      {
+        "i": 5,
+        "j": 6,
+        "cosine_sim": 0.998422
+      },
+      {
+        "i": 6,
+        "j": 7,
+        "cosine_sim": 0.998162
+      },
+      {
+        "i": 7,
+        "j": 8,
+        "cosine_sim": 0.996667
+      },
+      {
+        "i": 11,
+        "j": 12,
+        "cosine_sim": 0.999992
+      },
+      {
+        "i": 12,
+        "j": 13,
+        "cosine_sim": 0.999993
+      },
+      {
+        "i": 13,
+        "j": 14,
+        "cosine_sim": 0.999992
+      },
+      {
+        "i": 14,
+        "j": 15,
+        "cosine_sim": 0.999985
+      },
+      {
+        "i": 15,
+        "j": 16,
+        "cosine_sim": 0.999991
+      },
+      {
+        "i": 16,
+        "j": 17,
+        "cosine_sim": 0.999989
+      },
+      {
+        "i": 17,
+        "j": 18,
+        "cosine_sim": 0.999989
+      },
+      {
+        "i": 18,
+        "j": 19,
+        "cosine_sim": 0.999986
+      },
+      {
+        "i": 19,
+        "j": 20,
+        "cosine_sim": 0.999982
+      },
+      {
+        "i": 20,
+        "j": 21,
+        "cosine_sim": 0.999965
+      },
+      {
+        "i": 21,
+        "j": 22,
+        "cosine_sim": 0.999951
+      },
+      {
+        "i": 22,
+        "j": 23,
+        "cosine_sim": 0.999946
+      },
+      {
+        "i": 23,
+        "j": 24,
+        "cosine_sim": 0.999014
+      },
+      {
+        "i": 24,
+        "j": 25,
+        "cosine_sim": 0.999921
+      }
+    ],
+    "warning": "Report only. No layers were merged."
+  },
+  "compressibility": {
+    "analyzed": 6,
+    "compressible": 5,
+    "details": {
+      "block_24": {
+        "eff_rank": 1,
+        "full_rank": 5,
+        "ratio": 0.2,
+        "compressible": true
+      },
+      "block_25": {
+        "eff_rank": 1,
+        "full_rank": 5,
+        "ratio": 0.2,
+        "compressible": true
+      },
+      "block_26": {
+        "eff_rank": 1,
+        "full_rank": 5,
+        "ratio": 0.2,
+        "compressible": true
+      },
+      "block_27": {
+        "eff_rank": 1,
+        "full_rank": 5,
+        "ratio": 0.2,
+        "compressible": true
+      },
+      "block_28": {
+        "eff_rank": 2,
+        "full_rank": 5,
+        "ratio": 0.4,
+        "compressible": true
+      },
+      "block_29": {
+        "eff_rank": 3,
+        "full_rank": 5,
+        "ratio": 0.6,
+        "compressible": false
+      }
+    },
+    "warning": "Analysis only. Nothing was compressed."
+  },
+  "twin_tower": {
+    "threshold": 0.99,
+    "layers_compared": 435,
+    "clusters": [
+      [
+        "block_2",
+        "block_3",
+        "block_4",
+        "block_5",
+        "block_6",
+        "block_7",
+        "block_8"
+      ],
+      [
+        "block_11",
+        "block_12",
+        "block_13",
+        "block_14",
+        "block_15",
+        "block_16",
+        "block_17",
+        "block_18",
+        "block_19",
+        "block_20",
+        "block_21",
+        "block_22",
+        "block_23",
+        "block_24",
+        "block_25",
+        "block_26",
+        "block_27"
+      ]
+    ],
+    "max_pair_similarity": 0.999993,
+    "note": "a near-duplicate layer pair is a candidate for skipping, not for deleting"
+  },
+  "powerlaw": {
+    "layers_analyzed": 30,
+    "details": [
+      {
+        "layer": 0,
+        "activation_exponent": null
+      },
+      {
+        "layer": 1,
+        "activation_exponent": null
+      },
+      {
+        "layer": 2,
+        "activation_exponent": null
+      },
+      {
+        "layer": 3,
+        "activation_exponent": null
+      },
+      {
+        "layer": 4,
+        "activation_exponent": null
+      },
+      {
+        "layer": 5,
+        "activation_exponent": null
+      },
+      {
+        "layer": 6,
+        "activation_exponent": null
+      },
+      {
+        "layer": 7,
+        "activation_exponent": null
+      },
+      {
+        "layer": 8,
+        "activation_exponent": null
+      },
+      {
+        "layer": 9,
+        "activation_exponent": null
+      },
+      {
+        "layer": 10,
+        "activation_exponent": null
+      },
+      {
+        "layer": 11,
+        "activation_exponent": null
+      },
+      {
+        "layer": 12,
+        "activation_exponent": null
+      },
+      {
+        "layer": 13,
+        "activation_exponent": null
+      },
+      {
+        "layer": 14,
+        "activation_exponent": null
+      },
+      {
+        "layer": 15,
+        "activation_exponent": null
+      },
+      {
+        "layer": 16,
+        "activation_exponent": null
+      },
+      {
+        "layer": 17,
+        "activation_exponent": null
+      },
+      {
+        "layer": 18,
+        "activation_exponent": null
+      },
+      {
+        "layer": 19,
+        "activation_exponent": null
+      },
+      {
+        "layer": 20,
+        "activation_exponent": null
+      },
+      {
+        "layer": 21,
+        "activation_exponent": null
+      },
+      {
+        "layer": 22,
+        "activation_exponent": null
+      },
+      {
+        "layer": 23,
+        "activation_exponent": null
+      },
+      {
+        "layer": 24,
+        "activation_exponent": null
+      },
+      {
+        "layer": 25,
+        "activation_exponent": null
+      },
+      {
+        "layer": 26,
+        "activation_exponent": null
+      },
+      {
+        "layer": 27,
+        "activation_exponent": null
+      },
+      {
+        "layer": 28,
+        "activation_exponent": null
+      },
+      {
+        "layer": 29,
+        "activation_exponent": null
+      }
+    ],
+    "note": "a negative exponent_gap means the ACTIVATIONS are flatter than the WEIGHTS - the layer is closer to noise than to structured content"
+  },
+  "skip_run": {
+    "ok": true,
+    "max_abs_logit_delta": 37.8125,
+    "mean_abs_logit_delta": 13.6561775843,
+    "top1_agreement": 0.0,
+    "samples": 5,
+    "layer": 0,
+    "skippable": false
+  },
+  "contradiction": {
+    "note": "consecutive layers have a high output cosine, but skipping one changes the model's output - the residual stream carries the information, so a high cosine does NOT mean the layer is redundant",
+    "near_duplicate_pairs": 22,
+    "skip_run_max_delta": 37.8125,
+    "skippable": false
+  },
+  "ladder": {
+    "rules": [
+      {
+        "order": 1,
+        "name": "exactly_dead",
+        "description": "the unit fired on zero calibration samples",
+        "action": "REMOVE"
+      },
+      {
+        "order": 2,
+        "name": "nearly_dead",
+        "description": "the unit fired on fewer than rare_threshold of samples",
+        "action": "ZERO"
+      },
+      {
+        "order": 3,
+        "name": "twin_layer",
+        "description": "the unit's layer is a near-duplicate of another layer",
+        "action": "FLAG_LAYER"
+      },
+      {
+        "order": 4,
+        "name": "compressible_flat",
+        "description": "the layer is compressible and its spectrum is flat-tailed",
+        "action": "FLAG_COMPRESS"
+      },
+      {
+        "order": 5,
+        "name": "default",
+        "description": "no rule matched",
+        "action": "KEEP"
+      }
+    ],
+    "tally": {
+      "KEEP": 18432,
+      "FLAG_LAYER": 67584,
+      "FLAG_COMPRESS": 6144
+    },
+    "text": "LADDER (first matching rule wins):\n\n  1. if the unit fired on zero calibration samples\n       -> REMOVE   [0 units]\n  2. if the unit fired on fewer than rare_threshold of samples\n       -> ZERO   [0 units]\n  3. if the unit's layer is a near-duplicate of another layer\n       -> FLAG_LAYER   [67584 units]\n  4. if the layer is compressible and its spectrum is flat-tailed\n       -> FLAG_COMPRESS   [6144 units]\n  5. if no rule matched\n       -> KEEP   [18432 units]\n  else -> KEEP   [18432 units]"
+  },
+  "verdicts": [],
+  "applied": {
+    "ok": true,
+    "note": "the ladder selected nothing to change - this is the usual result on a healthy model",
+    "removed_modules": {},
+    "zeroed_modules": {}
+  }
+}
